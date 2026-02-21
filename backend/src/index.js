@@ -16,6 +16,8 @@ import billingRoutes from './routes/billing.js';
 import workspacesRoutes from './routes/workspaces.js';
 import teamsRoutes from './routes/teams.js';
 import permissionsRoutes from './routes/permissions.js';
+import productRoutes from './routes/products.js';
+import subscriptionRoutes from './routes/subscriptions.js';
 
 const app = express();
 
@@ -63,6 +65,8 @@ apiRouter.use('/billing', billingRoutes);
 apiRouter.use('/workspaces', workspacesRoutes);
 apiRouter.use('/teams', teamsRoutes);
 apiRouter.use('/permissions', permissionsRoutes);
+apiRouter.use('/products', productRoutes);
+apiRouter.use('/subscriptions', subscriptionRoutes);
 
 app.use(config.apiPrefix, apiRouter);
 

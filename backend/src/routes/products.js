@@ -1,0 +1,118 @@
+import express from 'express';
+import { PrismaClient } from '@prisma/client';
+import { validatePotentialProduct } from '../utils/productValidator.js';
+
+const router = express.Router();
+const prisma = new PrismaClient();
+
+/**
+ * @route GET /api/products/search
+ * @desc Search products and log results with market intelligence validation
+ */
+router.get('/search', async (req, res) => {
+    try {
+        const { q, brand, category } = req.query;
+
+        if (!q) {
+            return res.status(400).json({ error: 'Search query is required' });
+        }
+
+        // Prepare search filters
+        const where = {
+            OR: [
+                { name: { contains: q, mode: 'insensitive' } },
+                { sku: { contains: q, mode: 'insensitive' } },
+                { compatibility: { hasSome: [q] } },
+            ],
+        };
+
+        if (brand) where.brand = brand;
+        if (category) where.category = category;
+
+        // Execute search
+        const products = await prisma.product.findMany({
+            where,
+            take: 20,
+        });
+
+        const count = products.length;
+
+        // VALIDATION LOGIC: If no results found, check if it "exists in reality" (heuristic)
+        let validation = { isPotential: false };
+        if (count === 0) {
+            validation = validatePotentialProduct(q);
+        }
+
+        // LOGGING REQUIREMENT: Track missed opportunities vs typos
+        await prisma.searchLog.create({
+            data: {
+                query: q,
+                resultsCount: count,
+                isPotentialProduct: validation.isPotential,
+                metadata: count === 0 ? validation : {},
+                userId: req.user?.id || null,
+                ipAddress: req.ip,
+            },
+        });
+
+        res.json({
+            query: q,
+            total: count,
+            isPotentialValidProduct: validation.isPotential,
+            products
+        });
+    } catch (error) {
+        console.error('Search error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * @route GET /api/products/search-logs
+ * @desc Get missed opportunities (searches with 0 results)
+ * @access Private/Admin
+ */
+router.get('/search-logs', async (req, res) => {
+    try {
+        const logs = await prisma.searchLog.findMany({
+            where: {
+                resultsCount: 0,
+            },
+            orderBy: {
+                createdAt: 'desc',
+            },
+            take: 100,
+        });
+
+        res.json(logs);
+    } catch (error) {
+        console.error('Logs fetch error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * @route GET /api/products/lost-opportunities
+ * @desc Get high-confidence missed opportunities for the admin widget
+ */
+router.get('/lost-opportunities', async (req, res) => {
+    try {
+        const opportunities = await prisma.searchLog.findMany({
+            where: {
+                resultsCount: 0,
+                isPotentialProduct: true,
+            },
+            orderBy: {
+                createdAt: 'desc',
+            },
+            take: 10,
+        });
+
+        res.json(opportunities);
+    } catch (error) {
+        console.error('Opportunities fetch error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+export default router;

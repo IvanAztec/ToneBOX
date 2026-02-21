@@ -19,6 +19,8 @@ model User {
   password      String?
   avatar        String?
   role          String    @default("user")
+  whatsapp      String?   // Prioridad para captura de leads
+  estimatedConsumptionRate Float? // Tasa de consumo estimada (páginas/día)
   emailVerified DateTime?
   
   // Relations
@@ -188,6 +190,12 @@ model Product {
   id          String    @id @default(cuid())
   sku         String    @unique
   name        String
+  brand       String?   // Marca (HP, Brother, etc.)
+  category    String?   // Toner, Ink, Drum, etc.
+  color       String?   // Black, Cyan, etc.
+  yield       Int?      // Rendimiento de páginas
+  compatibility String[] @default([]) // Modelos de impresoras compatibles
+  
   providerId  String
   providerSku String?
   weightKg    Float
@@ -200,6 +208,63 @@ model Product {
   updatedAt   DateTime  @updatedAt
 
   @@map("products")
+}
+
+// Product bundle model (Toner + Drum pairings, Duo Packs)
+model ProductBundle {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  tonerId     String
+  drumId      String
+  price       Float?   // Optional bundle special price
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("product_bundles")
+}
+
+// Replenishment subscription system
+model ReplenishmentSubscription {
+  id           String    @id @default(cuid())
+  userId       String
+  productId    String
+  printerModel String?
+  
+  status       String    @default("active") // active, paused, cancelled
+  
+  // Consumption Logic
+  yield        Int       // Total pages expected (e.g., 1500)
+  consumptionRate Float  // User specific rate (pages/day)
+  lastRefillDate DateTime @default(now())
+  nextReminderDate DateTime
+  
+  // Timestamps
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([nextReminderDate])
+  @@map("replenishment_subscriptions")
+}
+
+// Search Log model to track missed opportunities
+model SearchLog {
+  id           String   @id @default(cuid())
+  query        String
+  resultsCount Int      @default(0)
+  isPotentialProduct Boolean @default(false) // Indica si parece un modelo real (ej. TN-660) o basura
+  metadata     Json?    // Para guardar info extra como marca detectada o categoría sugerida
+  userId       String?
+  ipAddress    String?
+  
+  // Timestamps
+  createdAt    DateTime @default(now())
+
+  @@index([query])
+  @@map("search_logs")
 }
 
 // Dispatch type for providers and rules

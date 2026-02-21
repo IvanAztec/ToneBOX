@@ -1,51 +1,44 @@
-# PRP-001: Mejora del Sistema de Búsqueda de Consumibles
+# PRP-001: ToneBOX - Modelo de Suscripción de Consumibles Inteligente
 
-**Estado**: 📝 Borrador (Esperando Aprobación)
+**Estado**: 🚀 Implementación en Curso (Upgrade de Inteligencia)
 **Autor**: Antigravity
 **Fecha**: 2026-02-21
 
-## 1. Contexto y Problema
-Actualmente, ToneBOX cuenta con un modelo de `Product` muy básico que solo incluye SKU y Nombre. Para un e-commerce especializado en consumibles (tintas y tóneres), los usuarios necesitan encontrar productos basándose en:
-- El modelo de su impresora (ej. "Brother HL-L2350DW").
-- El modelo del cartucho (ej. "TN760").
-- Atributos específicos (Color, Rendimiento, Marca).
+## 1. Contexto y Evolución
+ToneBOX ha evolucionado de ser un e-commerce literal a un sistema de **Suscripción de Reposición Anticipada**. En lugar de esperar a que el cliente se quede sin tinta, el sistema predice el agotamiento y actúa de forma proactiva.
 
-La búsqueda actual (si la hubiera) sería puramente literal por nombre, lo cual es ineficiente y propenso a errores de dedo.
+## 2. Pilares de la Nueva Inteligencia
 
-## 2. Objetivos de la Mejora
-- **Velocidad**: Encontrar el tóner correcto en menos de 3 pasos.
-- **Precisión**: Implementar búsqueda difusa (Fuzzy Search) para tolerar errores ortográficos.
-- **Relacionalidad**: Vincular productos con modelos de impresoras compatibles.
+### A. Heurística de Demanda (Tasa de Consumo)
+- Implementación de `EstimatedConsumptionRate` en el perfil de usuario.
+- Algoritmo de predicción: `(Rendimiento del Cartucho / Tasa de Consumo) - 7 días = Alerta`.
 
-## 3. Propuesta Técnica
+### B. Bundles Estratégicos (Duo Packs)
+- Relación vinculante entre Tóners y Drums (Tambores) mediante `ProductBundle`.
+- Lógica de Upsell automático: Ofrecer el Drum cuando el sistema detecta que es el tercer cambio de Tóner del cliente.
 
-### A. Refinamiento del Modelo de Datos (Prisma)
-Añadir metadatos esenciales al modelo `Product` en `schema.prisma`:
-- `brand`: Marca (HP, Brother, Epson, etc.)
-- `category`: Tipo (Toner, Ink, Drum, Waste Box).
-- `color`: Color del consumible.
-- `yield`: Rendimiento estimado (nº de páginas).
-- `compatibility`: Un campo de tipo `String[]` o una tabla relacionada para modelos de impresoras.
+### C. Captura de Leads (WhatsApp First)
+- Priorización de WhatsApp en Checkout para re-marketing directo.
+- Preparación de mensajes de "Sin Pausas": "Tu Duo Pack para la [Modelo] está listo".
 
-### B. Backend (Express + Prisma)
-- Crear un endpoint `GET /api/products/search`.
-- Configurar el soporte de Full-Text Search de PostgreSQL mediante Prisma.
-- Implementar filtros por marca y categoría.
+## 3. Propuesta Técnica Implementada
 
-### C. Frontend (Feature-First)
-- Crear la feature `/frontend/features/search`.
-- **Componente SearchBar**: Con sugerencias automáticas (debounced search).
-- **Componente CompatibilityChecker**: Una herramienta donde el usuario selecciona su impresora y se le muestran los consumibles compatibles.
+### Backend
+- **ProductValidator**: Refinado para el mercado mexicano (Canon G, Samsung MLT, Kyocera TK, Ricoh MP).
+- **SubscriptionService**: Lógica de cálculo de fechas de recordatorio.
+- **NotificationScheduler**: Estructura para envío de mensajes personalizados vía WhatsApp.
+- **Endpoints de Administración**:
+    - `GET /api/products/lost-opportunities`: Widget para capturar búsquedas fallidas pero reales.
+    - `GET /api/subscriptions/upcoming-renewals`: Vista de clientes a 7 días de agotar su stock.
 
-## 4. Plan de Implementación
-1. **Paso 1**: Actualizar `schema.prisma` y ejecutar migración.
-2. **Paso 2**: Crear el Service de Búsqueda en el backend con soporte para búsqueda difusa.
-3. **Paso 3**: Desarrollar la UI en el frontend siguiendo la estructura de "Features" de `CLAUDE.md`.
-4. **Paso 4**: Poblar la base de datos con datos de prueba reales (ej. Brother TN760, HP 58A).
+### Base de Datos (Prisma)
+- Nuevos modelos: `ProductBundle`, `ReplenishmentSubscription`.
+- Campos enriquecidos en `User` y `Product`.
 
-## 5. Riesgos
-- Complejidad en la normalización de nombres de impresoras (muchas variantes para un mismo modelo).
-- Rendimiento de la búsqueda si el catálogo escala a miles de SKUs (se mitigará con índices GIN/GiST).
+## 4. Próximos Pasos
+1. **Frontend**: Implementar los widgets en el Dashboard de Iván usando los nuevos endpoints.
+2. **Integración**: Conectar `NotificationScheduler` con una API de WhatsApp (ej. Twilio).
+3. **Escalabilidad**: Aplicar este mismo Blueprint a los siguientes 4 nichos detectados.
 
 ---
-**¿Aprobado para proceder?**
+**ToneBOX ya no solo vende productos; asegura la continuidad operativa de sus clientes.**

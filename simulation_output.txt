@@ -1,0 +1,20 @@
+???? Iniciando Simulaci??n de Compra y Marketing ToneBOX...
+
+--- PASO 1: Registro de Usuario y Lead Capture ---
+??? Usuario creado: Despacho Garza | WhatsApp: +528115551234
+
+--- PASO 2: Compra de Duo Pack Toner + Drum ---
+???? Calculando demanda basada en tasa: 25 p??g/d??a...
+??? Suscripci??n Activa:
+   - Producto: T??ner Brother TN660 Compatible Alta Capacidad
+   - Rendimiento: 2600 p??ginas
+   - Fecha Estimada Agotamiento: 5/6/2026
+   - ???? Recordatorio Programado (T-7): 29/5/2026
+
+--- PASO 3: Simulaci??n de B??squeda Fallida (Market Intel) ---
+???? B??squeda capturada: "Ricoh MP 402 toner"
+   - ??Es producto real?: S?? (Alta Confianza)
+   - Tipo Detectado: null | Marca: RICOH
+
+??? Simulaci??n completada con ??xito. ToneBOX est?? listo para el despliegue.
+
