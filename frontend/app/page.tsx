@@ -44,7 +44,7 @@ export default function HomePage() {
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500" />
-              <span className="font-bold text-xl">ToneBOX v1.2</span>
+              <span className="font-bold text-xl">ToneBOX v1.3</span>
             </div>
             <div className="flex items-center gap-4">
               <Link
