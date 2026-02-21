@@ -1,0 +1,8 @@
+{
+    "version": 2,
+    "public": true,
+    "buildCommand": "cd frontend && next build",
+    "installCommand": "cd frontend && npm install",
+    "outputDirectory": "frontend/.next",
+    "framework": "nextjs"
+}
