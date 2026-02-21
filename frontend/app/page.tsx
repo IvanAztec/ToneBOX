@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ArrowRight, Shield, CreditCard, Users, Building2, BarChart3, Zap } from 'lucide-react';
+import Footer from '@/components/shared/Footer';
 
 export default function HomePage() {
   const features = [
@@ -146,21 +147,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center gap-2 mb-4 md:mb-0">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500" />
-              <span className="font-bold text-white">ToneBOX</span>
-            </div>
-            <p className="text-sm">
-              © {new Date().getFullYear()} ToneBOX. Built with SaaS Factory.
-            </p>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }
-
