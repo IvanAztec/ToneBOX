@@ -4,6 +4,8 @@ const nextConfig = {
   images: {
     domains: ['localhost', 'avatars.githubusercontent.com'],
   },
+  // Desactivamos temporalmente los rewrites para diagnosticar el 404 de la home
+  /*
   async rewrites() {
     return [
       {
@@ -12,7 +14,7 @@ const nextConfig = {
       },
     ];
   },
+  */
 };
 
 module.exports = nextConfig;
-
