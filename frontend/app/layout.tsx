@@ -3,14 +3,14 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 
-const inter = Inter({ 
+const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
 });
 
 export const metadata: Metadata = {
-  title: 'SaaS App',
-  description: 'Your SaaS application - Generated with SaaS Factory',
+  title: 'ToneBOX - Consumibles de Impresión',
+  description: 'E-commerce B2B/B2C de consumibles de impresión en México - Powered by SaaS Factory',
 };
 
 export default function RootLayout({
@@ -26,4 +26,3 @@ export default function RootLayout({
     </html>
   );
 }
-

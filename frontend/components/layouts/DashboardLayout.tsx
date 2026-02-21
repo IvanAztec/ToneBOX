@@ -71,16 +71,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 lg:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between px-4 h-16 border-b border-gray-200">
             <Link href="/dashboard" className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500" />
-              <span className="font-bold text-lg text-gray-900">SaaS App</span>
+              <span className="font-bold text-lg text-gray-900">ToneBOX</span>
             </Link>
             <button
               onClick={closeSidebar}
@@ -116,11 +115,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-colors ${
-                    isActive
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-colors ${isActive
                       ? 'bg-primary-50 text-primary-600'
                       : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }`}
+                    }`}
                 >
                   <item.icon className="w-5 h-5" />
                   {item.name}

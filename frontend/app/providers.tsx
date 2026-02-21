@@ -102,7 +102,7 @@ export function Providers({ children }: { children: ReactNode }) {
   // Check authentication on mount
   useEffect(() => {
     let isMounted = true;
-    
+
     const checkAuth = async () => {
       try {
         const response = await fetch('/api/auth/me');
@@ -120,7 +120,7 @@ export function Providers({ children }: { children: ReactNode }) {
     };
 
     checkAuth();
-    
+
     return () => {
       isMounted = false;
     };
@@ -134,13 +134,20 @@ export function Providers({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-      
+
       if (!response.ok) {
         throw new Error('Login failed');
       }
-      
+
       const userData = await response.json();
-      setUser(userData.user);
+      const user = userData.data?.user || userData.user;
+      const token = userData.data?.accessToken || userData.accessToken;
+
+      if (token) {
+        localStorage.setItem('auth_token', token);
+      }
+
+      setUser(user);
     } catch (error) {
       throw error;
     }
@@ -163,13 +170,20 @@ export function Providers({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, name }),
       });
-      
+
       if (!response.ok) {
         throw new Error('Registration failed');
       }
-      
+
       const userData = await response.json();
-      setUser(userData.user);
+      const user = userData.data?.user || userData.user;
+      const token = userData.data?.accessToken || userData.accessToken;
+
+      if (token) {
+        localStorage.setItem('auth_token', token);
+      }
+
+      setUser(user);
     } catch (error) {
       throw error;
     }
@@ -191,11 +205,11 @@ export function Providers({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to create workspace');
       }
-      
+
       const newWorkspace = await response.json();
       setWorkspaces(prev => [...prev, newWorkspace]);
       return newWorkspace;
@@ -208,7 +222,7 @@ export function Providers({ children }: { children: ReactNode }) {
   const addToast = useCallback((message: string, type: Toast['type']) => {
     const id = Math.random().toString(36).substring(7);
     setToasts(prev => [...prev, { id, message, type }]);
-    
+
     // Auto-remove after 5 seconds
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
@@ -268,12 +282,11 @@ function ToastContainer() {
       {toasts?.length > 0 ? toasts.map((toast) => (
         <div
           key={toast.id}
-          className={`animate-slide-up rounded-lg px-4 py-3 shadow-lg ${
-            toast.type === 'success' ? 'bg-green-500 text-white' :
-            toast.type === 'error' ? 'bg-red-500 text-white' :
-            toast.type === 'warning' ? 'bg-yellow-500 text-white' :
-            'bg-blue-500 text-white'
-          }`}
+          className={`animate-slide-up rounded-lg px-4 py-3 shadow-lg ${toast.type === 'success' ? 'bg-green-500 text-white' :
+              toast.type === 'error' ? 'bg-red-500 text-white' :
+                toast.type === 'warning' ? 'bg-yellow-500 text-white' :
+                  'bg-blue-500 text-white'
+            }`}
         >
           <div className="flex items-center gap-2">
             <span>{toast.message}</span>

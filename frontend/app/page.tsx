@@ -43,7 +43,7 @@ export default function HomePage() {
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500" />
-              <span className="font-bold text-xl">SaaS App</span>
+              <span className="font-bold text-xl">ToneBOX</span>
             </div>
             <div className="flex items-center gap-4">
               <Link
@@ -67,29 +67,29 @@ export default function HomePage() {
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary-50 via-white to-accent-50" />
         <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
-        
+
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32">
           <div className="text-center max-w-3xl mx-auto">
             <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 mb-6 animate-fade-in">
-              Build Your SaaS
-              <span className="gradient-text block mt-2">Faster Than Ever</span>
+              Potencia tu Negocio con
+              <span className="gradient-text block mt-2">ToneBOX</span>
             </h1>
             <p className="text-xl text-gray-600 mb-8 animate-slide-up">
-              A production-ready SaaS boilerplate with authentication, payments, 
-              multi-tenancy, and everything you need to launch quickly.
+              La plataforma líder en consumibles de impresión B2B/B2C en México.
+              Calidad, velocidad y el mejor catálogo a tu alcance.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center animate-slide-up">
               <Link
                 href="/auth/register"
                 className="inline-flex items-center justify-center gap-2 bg-primary-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-600 transition-all hover:scale-105"
               >
-                Start Building <ArrowRight className="w-4 h-4" />
+                Empezar Ahora <ArrowRight className="w-4 h-4" />
               </Link>
               <Link
                 href="/dashboard"
                 className="inline-flex items-center justify-center gap-2 bg-white text-gray-700 px-6 py-3 rounded-lg font-medium border hover:bg-gray-50 transition-colors"
               >
-                View Demo
+                Ver Catálogo
               </Link>
             </div>
           </div>
@@ -101,10 +101,10 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              Everything You Need
+              Todo lo que tu Impresora Necesita
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Skip months of boilerplate setup. Start with a fully-featured foundation.
+              Saltamos la burocracia. Consigue tus suministros de manera directa y eficiente.
             </p>
           </div>
 
@@ -132,16 +132,16 @@ export default function HomePage() {
       <section className="py-24 bg-gradient-to-br from-primary-500 to-accent-600">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl lg:text-4xl font-bold text-white mb-6">
-            Ready to Launch Your SaaS?
+            ¿Listo para Transformar tu Suministro?
           </h2>
           <p className="text-xl text-primary-100 mb-8">
-            Join thousands of founders who&apos;ve accelerated their journey.
+            Únete a cientos de empresas que ya optimizan su stock con ToneBOX.
           </p>
           <Link
             href="/auth/register"
             className="inline-flex items-center gap-2 bg-white text-primary-600 px-8 py-4 rounded-lg font-semibold hover:bg-primary-50 transition-colors"
           >
-            Get Started Free <ArrowRight className="w-5 h-5" />
+            Registrarse Gratis <ArrowRight className="w-5 h-5" />
           </Link>
         </div>
       </section>
@@ -152,10 +152,10 @@ export default function HomePage() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center gap-2 mb-4 md:mb-0">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500" />
-              <span className="font-bold text-white">SaaS App</span>
+              <span className="font-bold text-white">ToneBOX</span>
             </div>
             <p className="text-sm">
-              © {new Date().getFullYear()} SaaS App. Built with SaaS Factory.
+              © {new Date().getFullYear()} ToneBOX. Built with SaaS Factory.
             </p>
           </div>
         </div>
