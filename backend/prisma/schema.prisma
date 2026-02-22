@@ -43,6 +43,10 @@ model Workspace {
   plan        String    @default("free")
   settings    Json?
   
+  // Multi-SaaS Orchestration
+  projectId   String?
+  project     SaaSProject? @relation(fields: [projectId], references: [id])
+  
   // Owner relation
   ownerId     String
   owner       User      @relation("WorkspaceOwner", fields: [ownerId], references: [id])
@@ -57,6 +61,63 @@ model Workspace {
   updatedAt   DateTime  @updatedAt
   
   @@map("workspaces")
+}
+
+// Multi-SaaS Master Orchestrator
+model SaaSProject {
+  id          String    @id @default(cuid())
+  name        String    // e.g., "ToneBOX"
+  description String?
+  brandColor  String?
+  active      Boolean   @default(true)
+
+  // Relations
+  workspaces  Workspace[]
+  marketing   MarketingConfig?
+  analytics   AnalyticsEvent[]
+
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("saas_projects")
+}
+
+// Conversion Analytics
+model AnalyticsEvent {
+  id          String    @id @default(cuid())
+  type        String    // VISIT, CLICK
+  category    String    // WHATSAPP, HERO, CHECKOUT
+  metadata    Json?
+  
+  projectId   String
+  project     SaaSProject @relation(fields: [projectId], references: [id])
+  
+  workspaceId String?
+  userId      String?
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+
+  @@index([projectId, type])
+  @@map("analytics_events")
+}
+
+// Marketing Tracking Configuration
+model MarketingConfig {
+  id            String    @id @default(cuid())
+  projectId     String    @unique
+  project       SaaSProject @relation(fields: [projectId], references: [id])
+
+  googleAdsId   String?
+  fbPixelId     String?
+  tagManagerId  String?
+  tiktokPixelId String?
+
+  // Timestamps
+  updatedAt     DateTime  @updatedAt
+
+  @@map("marketing_configs")
 }
 
 // Workspace membership (many-to-many)
@@ -255,8 +316,8 @@ model SearchLog {
   id           String   @id @default(cuid())
   query        String
   resultsCount Int      @default(0)
-  isPotentialProduct Boolean @default(false) // Indica si parece un modelo real (ej. TN-660) o basura
-  metadata     Json?    // Para guardar info extra como marca detectada o categoría sugerida
+  isPotentialProduct Boolean @default(false)
+  metadata     Json?
   userId       String?
   ipAddress    String?
   
@@ -265,6 +326,43 @@ model SearchLog {
 
   @@index([query])
   @@map("search_logs")
+}
+
+// Auto-blindaje: Alertas de productos en demanda que no existen en el catálogo
+model CatalogAlert {
+  id            String   @id @default(cuid())
+  query         String   @unique  // El término buscado (normalizado)
+  hitCount      Int      @default(1)
+  detectedBrand String?
+  detectedType  String?  // toner, ink, drum, etc.
+  confidence    String   @default("medium") // low, medium, high
+  priority      String   @default("MEDIUM") // MEDIUM, HIGH, CRITICAL
+  status        String   @default("PENDING") // PENDING, PROMOTED, DISMISSED
+
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status, priority])
+  @@map("catalog_alerts")
+}
+
+// Borradores de producto generados por el sistema a partir de CatalogAlerts
+model ProductDraft {
+  id             String   @id @default(cuid())
+  suggestedSku   String
+  suggestedName  String
+  brand          String?
+  category       String?
+  status         String   @default("PENDING_REVIEW") // PENDING_REVIEW, APPROVED, REJECTED
+  sourceAlertId  String?
+  demandScore    Int      @default(0) // Número de búsquedas que lo generaron
+
+  // Timestamps
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("product_drafts")
 }
 
 // Dispatch type for providers and rules

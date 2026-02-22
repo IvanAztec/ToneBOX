@@ -30,6 +30,8 @@
     "eslint": "^8.56.0",
     "nodemon": "^3.0.3",
     "prisma": "^5.9.1"
+  },
+  "prisma": {
+    "seed": "node prisma/seed_master.js"
   }
 }
-

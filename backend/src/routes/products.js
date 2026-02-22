@@ -1,6 +1,7 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { validatePotentialProduct } from '../utils/productValidator.js';
+import { evaluateDemandThreshold } from '../services/catalogIntelligence.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -55,10 +56,17 @@ router.get('/search', async (req, res) => {
             },
         });
 
+        // AUTO-BLINDAJE: Si no hay resultados, evaluar si debemos crear una alerta
+        let catalogAlert = null;
+        if (count === 0 && validation.isPotential) {
+            catalogAlert = await evaluateDemandThreshold(q, validation);
+        }
+
         res.json({
             query: q,
             total: count,
             isPotentialValidProduct: validation.isPotential,
+            ...(catalogAlert && { demandAlert: { priority: catalogAlert.priority, hitCount: catalogAlert.hitCount } }),
             products
         });
     } catch (error) {

@@ -18,6 +18,7 @@ import teamsRoutes from './routes/teams.js';
 import permissionsRoutes from './routes/permissions.js';
 import productRoutes from './routes/products.js';
 import subscriptionRoutes from './routes/subscriptions.js';
+import catalogRoutes from './routes/catalog.js';
 
 const app = express();
 
@@ -67,6 +68,7 @@ apiRouter.use('/teams', teamsRoutes);
 apiRouter.use('/permissions', permissionsRoutes);
 apiRouter.use('/products', productRoutes);
 apiRouter.use('/subscriptions', subscriptionRoutes);
+apiRouter.use('/catalog', catalogRoutes);
 
 app.use(config.apiPrefix, apiRouter);
 
