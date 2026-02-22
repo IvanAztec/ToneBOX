@@ -19,6 +19,7 @@ import permissionsRoutes from './routes/permissions.js';
 import productRoutes from './routes/products.js';
 import subscriptionRoutes from './routes/subscriptions.js';
 import catalogRoutes from './routes/catalog.js';
+import paymentRoutes from './routes/payments.js';
 
 const app = express();
 
@@ -69,6 +70,7 @@ apiRouter.use('/permissions', permissionsRoutes);
 apiRouter.use('/products', productRoutes);
 apiRouter.use('/subscriptions', subscriptionRoutes);
 apiRouter.use('/catalog', catalogRoutes);
+apiRouter.use('/payments', paymentRoutes);
 
 app.use(config.apiPrefix, apiRouter);
 

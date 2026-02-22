@@ -273,16 +273,17 @@ model Product {
 
 // Product bundle model (Toner + Drum pairings, Duo Packs)
 model ProductBundle {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  tonerId     String
-  drumId      String
-  price       Float?   // Optional bundle special price
+  id                 String   @id @default(cuid())
+  name               String
+  description        String?
+  tonerId            String
+  drumId             String
+  price              Float?   // Optional bundle special price
+  availabilityStatus String   @default("IN_STOCK") // IN_STOCK | ON_DEMAND | OUT_OF_STOCK
   
   // Timestamps
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   @@map("product_bundles")
 }
@@ -365,6 +366,42 @@ model ProductDraft {
   @@map("product_drafts")
 }
 
+
+// Registro de pagos SPEI - Ciclo: PENDING_VALIDATION -> APPROVED
+model SpeiPayment {
+  id            String    @id @default(cuid())
+  orderId       String
+  amount        Float
+  productName   String?
+  trackingKey   String?
+  status        String    @default("PENDING_VALIDATION")
+  clientContact String?
+  approvedAt    DateTime?
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+  @@index([orderId])
+  @@map("spei_payments")
+}
+
+// Lead de captura de demanda - Productos sin stock o inexistentes
+model DemandCaptureLead {
+  id            String    @id @default(cuid())
+  query         String
+  name          String?
+  contact       String
+  contactType   String    @default("whatsapp")
+  status        String    @default("PENDING")
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([query])
+  @@index([status])
+  @@map("demand_capture_leads")
+}
 // Dispatch type for providers and rules
 enum DispatchType {
   DIRECT
