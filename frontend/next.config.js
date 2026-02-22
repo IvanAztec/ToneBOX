@@ -2,10 +2,13 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['localhost', 'avatars.githubusercontent.com'],
+    domains: [
+      'localhost',
+      'avatars.githubusercontent.com',
+      'tonebox.mx',
+      'www.tonebox.mx',
+    ],
   },
-  // Desactivamos temporalmente los rewrites para diagnosticar el 404 de la home
-  /*
   async rewrites() {
     return [
       {
@@ -14,7 +17,6 @@ const nextConfig = {
       },
     ];
   },
-  */
 };
 
 module.exports = nextConfig;

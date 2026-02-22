@@ -1,38 +1,33 @@
-/**
- * SPEI Payment Service
- * Maneja la confirmación de transferencias SPEI y las notificaciones al admin.
- */
-
 import nodemailer from 'nodemailer';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Configuración de correo (usa variables de entorno)
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
         user: process.env.ADMIN_EMAIL,
-        pass: process.env.ADMIN_EMAIL_PASSWORD, // App password de Google
+        pass: process.env.ADMIN_EMAIL_PASSWORD,
     },
 });
 
 /**
- * Procesa la confirmación de pago SPEI del cliente:
- * 1. Crea el registro de pago en la BD con estatus PENDING_VALIDATION.
- * 2. Dispara el correo de alerta a Iván con todos los detalles + comprobante adjunto.
- *
- * @param {Object} data - Datos del pago confirmado por el cliente
- * @param {Buffer|null} receiptBuffer - Buffer del archivo de comprobante subido
- * @param {string|null} receiptMimetype - Tipo MIME del comprobante
+ * Procesa la confirmación de pago SPEI:
+ * 1. Crea/actualiza el SpeiPayment con PENDING_VALIDATION
+ * 2. Dispara correo a Iván con asunto: [FOLIO] - Nueva Orden de [Cliente]
+ * 3. Adjunta el comprobante si el cliente lo subió
  */
 export async function processSpeiConfirmation(data, receiptBuffer = null, receiptMimetype = null) {
-    const { orderId, amount, productName, trackingKey, clientName, clientContact } = data;
+    const { orderId, folio, amount, productName, trackingKey, clientName, clientContact } = data;
 
-    // 1. Registrar el pago en la base de datos
+    // Construir el folio display (si no viene, usar orderId)
+    const displayFolio = folio || orderId;
+    const displayClient = clientName || clientContact || 'Cliente Anónimo';
+
+    // 1. Registrar el pago en BD
     const speiPayment = await prisma.speiPayment.create({
         data: {
-            orderId,
+            orderId: displayFolio,
             amount: parseFloat(amount),
             productName,
             trackingKey: trackingKey || null,
@@ -41,65 +36,88 @@ export async function processSpeiConfirmation(data, receiptBuffer = null, receip
         }
     });
 
-    // 2. Preparar el correo de notificación para Iván
+    // 2. Armar el link de Banxico CEP
     const banxeoCepUrl = trackingKey
         ? `https://www.banxico.org.mx/cep/?i=SPEI&t=${trackingKey}`
         : 'https://www.banxico.org.mx/cep/';
 
+    // 3. Correo blindado con asunto estándar ToneBOX
     const emailContent = {
         from: `"ToneBOX Sistema" <${process.env.ADMIN_EMAIL}>`,
         to: process.env.ADMIN_PERSONAL_EMAIL || process.env.ADMIN_EMAIL,
-        subject: `🚨 NUEVA TRANSFERENCIA SPEI — ${orderId} | $${parseFloat(amount).toFixed(2)} MXN`,
+        subject: `[${displayFolio}] - Nueva Orden de ${displayClient}`,
         html: `
-            <div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <div style="background: #111827; border-radius: 16px; padding: 32px; color: white; margin-bottom: 24px;">
-                    <h1 style="font-size: 24px; font-weight: 900; margin: 0 0 8px;">¡Pago SPEI por Validar!</h1>
-                    <p style="color: #9ca3af; margin: 0; font-size: 14px;">El cliente confirmó la transferencia. Acción requerida.</p>
+            <div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto; background: #fff;">
+                <!-- Header -->
+                <div style="background: #111827; border-radius: 16px 16px 0 0; padding: 32px; color: white;">
+                    <div style="font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; color: #6b7280; margin-bottom: 8px;">ToneBOX — Pago Pendiente de Validación</div>
+                    <h1 style="font-size: 28px; font-weight: 900; margin: 0; letter-spacing: -1px;">${displayFolio}</h1>
+                    <p style="color: #9ca3af; margin: 4px 0 0; font-size: 14px;">Nueva Orden de <strong>${displayClient}</strong></p>
                 </div>
-                
-                <div style="background: #f9fafb; border-radius: 12px; padding: 24px; margin-bottom: 16px; border: 1px solid #e5e7eb;">
-                    <h2 style="font-size: 14px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; margin: 0 0 16px;">Detalles del Pedido</h2>
-                    <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
-                        <tr><td style="padding: 6px 0; color: #6b7280;">Orden ID</td><td style="font-weight: 700;">${orderId}</td></tr>
-                        <tr><td style="padding: 6px 0; color: #6b7280;">Producto</td><td style="font-weight: 700;">${productName}</td></tr>
-                        <tr><td style="padding: 6px 0; color: #6b7280;">Monto</td><td style="font-weight: 900; color: #059669; font-size: 18px;">$${parseFloat(amount).toFixed(2)} MXN</td></tr>
-                        ${trackingKey ? `<tr><td style="padding: 6px 0; color: #6b7280;">Clave de Rastreo</td><td style="font-family: monospace; font-weight: 700;">${trackingKey}</td></tr>` : ''}
-                        ${clientContact ? `<tr><td style="padding: 6px 0; color: #6b7280;">Contacto Cliente</td><td style="font-weight: 700;">${clientContact}</td></tr>` : ''}
+
+                <!-- Detalles -->
+                <div style="padding: 32px; border: 1px solid #f3f4f6; border-top: none; border-radius: 0 0 16px 16px;">
+                    <table style="width: 100%; font-size: 14px; border-collapse: collapse; margin-bottom: 24px;">
+                        <tr style="border-bottom: 1px solid #f3f4f6;">
+                            <td style="padding: 12px 0; color: #6b7280; font-weight: 600;">Folio</td>
+                            <td style="padding: 12px 0; font-weight: 900; font-family: monospace; font-size: 16px;">${displayFolio}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #f3f4f6;">
+                            <td style="padding: 12px 0; color: #6b7280; font-weight: 600;">Producto</td>
+                            <td style="padding: 12px 0; font-weight: 700;">${productName}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #f3f4f6;">
+                            <td style="padding: 12px 0; color: #6b7280; font-weight: 600;">Monto</td>
+                            <td style="padding: 12px 0; font-weight: 900; color: #059669; font-size: 22px;">$${parseFloat(amount).toFixed(2)} MXN</td>
+                        </tr>
+                        ${trackingKey ? `
+                        <tr style="border-bottom: 1px solid #f3f4f6;">
+                            <td style="padding: 12px 0; color: #6b7280; font-weight: 600;">Clave de Rastreo</td>
+                            <td style="padding: 12px 0; font-family: monospace; font-weight: 700; color: #1d4ed8;">${trackingKey}</td>
+                        </tr>` : ''}
+                        ${clientContact ? `
+                        <tr>
+                            <td style="padding: 12px 0; color: #6b7280; font-weight: 600;">Contacto Cliente</td>
+                            <td style="padding: 12px 0; font-weight: 700;">${clientContact}</td>
+                        </tr>` : ''}
                     </table>
+
+                    <!-- Acción Principal: Verificar en Banxico -->
+                    <a href="${banxeoCepUrl}" target="_blank" 
+                       style="display: block; background: #1d4ed8; color: white; text-align: center; 
+                              padding: 18px; border-radius: 12px; font-weight: 900; font-size: 15px; 
+                              text-decoration: none; letter-spacing: -0.3px; margin-bottom: 16px;">
+                        🔍 Verificar Transferencia en Banxico CEP →
+                    </a>
+
+                    <p style="font-size: 11px; color: #d1d5db; text-align: center; margin: 0;">
+                        Pago ID: ${speiPayment.id} &nbsp;·&nbsp; ${new Date().toLocaleString('es-MX', { timeZone: 'America/Monterrey' })} CST
+                    </p>
                 </div>
-
-                <a href="${banxeoCepUrl}" target="_blank" style="display: block; background: #1d4ed8; color: white; text-align: center; padding: 16px; border-radius: 12px; font-weight: 900; font-size: 14px; text-decoration: none; margin-bottom: 16px;">
-                    🔍 Verificar Transferencia en Banxico CEP →
-                </a>
-
-                <p style="font-size: 11px; color: #9ca3af; text-align: center;">
-                    Pago ID: ${speiPayment.id} · ToneBOX Sistema Automático · ${new Date().toLocaleString('es-MX')}
-                </p>
             </div>
         `,
         attachments: receiptBuffer ? [
             {
-                filename: `comprobante-${orderId}.${receiptMimetype?.split('/')[1] || 'pdf'}`,
+                filename: `comprobante-${displayFolio}.${receiptMimetype?.split('/')[1] || 'pdf'}`,
                 content: receiptBuffer,
                 contentType: receiptMimetype,
             }
         ] : [],
     };
 
-    // 3. Enviar el correo
+    // 4. Enviar correo
     try {
         await transporter.sendMail(emailContent);
-        console.log(`[SpeiService] ✅ Notificación enviada a admin para orden ${orderId}`);
+        console.log(`[SpeiService] ✅ Correo enviado: "${emailContent.subject}"`);
     } catch (emailError) {
-        console.error(`[SpeiService] ⚠️ Error enviando correo (pago sí registrado):`, emailError.message);
+        console.error(`[SpeiService] ⚠️ Correo no enviado (pago sí registrado):`, emailError.message);
     }
 
     return speiPayment;
 }
 
 /**
- * Valida y libera una orden SPEI como PAGADA.
- * Lo llama Iván desde el Admin Panel tras verificar en Banxico CEP.
+ * Aprueba manualmente un SPEI desde el Master Panel (tras verificar en Banxico)
  */
 export async function approveSpeiPayment(speiPaymentId) {
     return prisma.speiPayment.update({

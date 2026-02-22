@@ -13,26 +13,62 @@ datasource db {
 
 // User model
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String?
-  password      String?
-  avatar        String?
-  role          String    @default("user")
-  whatsapp      String?   // Prioridad para captura de leads
-  estimatedConsumptionRate Float? // Tasa de consumo estimada (páginas/día)
-  emailVerified DateTime?
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String?
+  password       String?
+  avatar         String?
+  role           String    @default("user")
+  whatsapp       String?
+  customerNumber Int       @unique @default(autoincrement())
+  estimatedConsumptionRate Float?
+  emailVerified  DateTime?
   
   // Relations
-  workspaces    WorkspaceMember[]
+  workspaces     WorkspaceMember[]
   ownedWorkspaces Workspace[] @relation("WorkspaceOwner")
-  invitesSent   Invite[]   @relation("InvitesSent")
+  invitesSent    Invite[]   @relation("InvitesSent")
+  orders         Order[]
   
   // Timestamps
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
   
   @@map("users")
+}
+
+// Modelo de Órdenes — Folio formato TB-[orderNumber]
+model Order {
+  id            String    @id @default(cuid())
+  orderNumber   Int       @unique @default(autoincrement())
+  folio         String    @unique
+  
+  userId        String?
+  user          User?     @relation(fields: [userId], references: [id])
+  
+  productName   String
+  amount        Float
+  currency      String    @default("MXN")
+  status        String    @default("PENDING")
+  paymentMethod String    @default("PENDING")
+  clientName    String?
+  clientContact String?
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+  @@index([folio])
+  @@map("orders")
+}
+
+// Idempotencia Stripe — Evita procesar el mismo evento dos veces
+model ProcessedStripeEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now())
+
+  @@map("processed_stripe_events")
 }
 
 // Workspace model (for multi-tenancy)
@@ -248,15 +284,16 @@ model ProviderShippingRule {
 
 // Product model (inventory items linked to providers)
 model Product {
-  id          String    @id @default(cuid())
-  sku         String    @unique
-  name        String
-  brand       String?   // Marca (HP, Brother, etc.)
-  category    String?   // Toner, Ink, Drum, etc.
-  color       String?   // Black, Cyan, etc.
-  yield       Int?      // Rendimiento de páginas
-  compatibility String[] @default([]) // Modelos de impresoras compatibles
-  
+  id                 String    @id @default(cuid())
+  sku                String    @unique
+  name               String
+  brand              String?   // Marca (HP, Brother, etc.)
+  category           String?   // Toner, Ink, Drum, etc.
+  color              String?   // Black, Cyan, etc.
+  yield              Int?      // Rendimiento de páginas
+  compatibility      String[]  @default([]) // Modelos de impresoras compatibles
+  availabilityStatus String    @default("IN_STOCK") // IN_STOCK | ON_DEMAND | OUT_OF_STOCK
+
   providerId  String
   providerSku String?
   weightKg    Float
