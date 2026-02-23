@@ -14,6 +14,7 @@ import {
     filterAhorroProducts,
     mapCTProductToSchema,
 } from '../services/ctService.js';
+import { downloadCTCatalogViaFTP } from '../services/ftpService.js';
 import { generateBundlesFromDB } from '../services/bundleGenerator.js';
 
 const router = express.Router();
@@ -40,11 +41,17 @@ router.post('/ct/ingest', async (req, res) => {
     console.log('[CT Ingest] Iniciando ingesta de catálogo...');
 
     try {
-        // 1. Obtener token CT
-        const token    = await getCTToken();
-
-        // 2. Descargar existencias
-        const rawData  = await getCTExistencia(token);
+        // 1. Descargar catálogo — FTP primero, HTTP API como fallback
+        let rawData;
+        try {
+            rawData = await downloadCTCatalogViaFTP();
+            console.log('[CT Ingest] Fuente: FTP');
+        } catch (ftpErr) {
+            console.warn(`[CT Ingest] FTP falló (${ftpErr.message}), intentando HTTP API...`);
+            const token = await getCTToken();
+            rawData = await getCTExistencia(token);
+            console.log('[CT Ingest] Fuente: HTTP API');
+        }
 
         // 3. Filtrar categorías "Ahorro"
         const filtered = filterAhorroProducts(rawData);
@@ -87,6 +94,8 @@ router.post('/ct/ingest', async (req, res) => {
                     yield:             mapped.yield,
                     compatibility:     mapped.compatibility,
                     availabilityStatus: mapped.availabilityStatus,
+                    priceMXN:          mapped.priceMXN,
+                    image:             mapped.image,
                     providerId:        mapped.providerId,
                     providerSku:       mapped.providerSku,
                     weightKg:          mapped.weightKg,

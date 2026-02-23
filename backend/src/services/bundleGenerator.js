@@ -24,7 +24,7 @@ export async function generateBundlesFromDB() {
             availabilityStatus: 'IN_STOCK',
             category: { in: ['Toner', 'Drum'] },
         },
-        select: { id: true, sku: true, name: true, brand: true, category: true, compatibility: true },
+        select: { id: true, sku: true, name: true, brand: true, category: true, compatibility: true, priceMXN: true },
     });
 
     const toners = products.filter(p => p.category === 'Toner');
@@ -52,11 +52,18 @@ export async function generateBundlesFromDB() {
             const sharedModels = toner.compatibility.filter(m => drum.compatibility.includes(m));
             const printerModel = sharedModels[0] || 'Compatible';
 
+            // Precio bundle: suma de precios reales * 0.87 (13% ahorro)
+            const rawPrice = (toner.priceMXN || 0) + (drum.priceMXN || 0);
+            const bundlePrice = rawPrice > 0
+                ? parseFloat((rawPrice * BUNDLE_DISCOUNT).toFixed(2))
+                : null;
+
             bundlesToCreate.push({
                 name:        `Duo Pack ${toner.brand} ${printerModel}`,
                 description: `${toner.name} + ${drum.name}`,
                 tonerId:     toner.id,
                 drumId:      drum.id,
+                price:       bundlePrice,
                 availabilityStatus: 'IN_STOCK',
             });
         }

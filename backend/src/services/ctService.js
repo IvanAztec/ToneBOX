@@ -90,16 +90,25 @@ function ctFetch(targetUrl, options = {}) {
     });
 }
 
-// ── Categorías "Ahorro" permitidas ────────────────────────────────────────────
-const ALLOWED_KEYWORDS = [
-    'toner', 'tóner', 'tooner', 'drum', 'tambor',
-    'cartucho', 'tinta', 'ribbon', 'cinta', 'consumible',
-    'ink', 'inkjet',
+// ── Filtro estricto: SOLO consumibles de impresión ────────────────────────────
+// Subcategorías exactas del catálogo FTP CT
+const PRINT_SUBCATEGORIES = [
+    'tóners', 'toners', 'cartuchos', 'drums', 'tambores',
+    'ribbons', 'cintas', 'tintas',
 ];
 
+// Palabras clave en nombre/descripción (para catálogos HTTP o fallback)
+const PRINT_KEYWORDS = [
+    'toner', 'tóner', 'drum', 'tambor',
+    'cartucho', 'tinta', 'ribbon', 'cinta',
+    'ink', 'inkjet', 'cartridge',
+];
+
+// Marcas de impresión permitidas
 const ALLOWED_BRANDS = [
     'brother', 'hp', 'hewlett', 'canon', 'epson', 'ricoh',
     'samsung', 'lexmark', 'xerox', 'kyocera', 'sharp', 'zebra',
+    'oki', 'dell', 'fuji', 'konica',
 ];
 
 // ── Autenticación ─────────────────────────────────────────────────────────────
@@ -151,32 +160,42 @@ export async function getCTExistencia(token) {
     return products;
 }
 
-// ── Normaliza existencia (puede ser número o array por ciudad) ────────────────
+// ── Normaliza existencia ──────────────────────────────────────────────────────
+// Formatos: número | array [{cantidad}] | objeto {"SLP":2,"GDL":5} (FTP)
 function normalizeStock(existencia) {
     if (typeof existencia === 'number') return existencia;
     if (Array.isArray(existencia)) {
         return existencia.reduce((sum, e) => sum + (e.cantidad || e.stock || 0), 0);
     }
+    if (existencia && typeof existencia === 'object') {
+        return Object.values(existencia).reduce((sum, v) => sum + (Number(v) || 0), 0);
+    }
     return 0;
 }
 
-// ── Filtra por categorías "Ahorro" ────────────────────────────────────────────
+// ── Filtra SOLO consumibles de impresión ─────────────────────────────────────
 export function filterAhorroProducts(products) {
     const filtered = products.filter(p => {
         const stock = normalizeStock(p.existencia ?? p.stock ?? p.cantidad ?? 0);
         if (stock <= 0) return false;
 
-        const haystack = [
-            p.nombre, p.descripcion, p.categoria,
-            p.subcategoria, p.tipoproducto, p.tipo,
-        ].join(' ').toLowerCase();
+        // Prioridad 1: subcategoría exacta del catálogo FTP (más preciso)
+        const sub = (p.subcategoria || '').toLowerCase().trim();
+        if (PRINT_SUBCATEGORIES.includes(sub)) return true;
 
-        const brandName = (p.marca || p.brand || '').toLowerCase();
+        // Prioridad 2: categoria = "Consumibles" con keyword en nombre
+        if ((p.categoria || '').toLowerCase() === 'consumibles') {
+            const nombre = (p.nombre || '').toLowerCase();
+            if (PRINT_KEYWORDS.some(kw => nombre.includes(kw))) return true;
+        }
 
-        const isAllowedCategory = ALLOWED_KEYWORDS.some(kw => haystack.includes(kw));
-        const isAllowedBrand    = ALLOWED_BRANDS.some(b => brandName.includes(b) || haystack.includes(b));
+        // Prioridad 3: keyword en nombre/descripción + marca de impresión conocida
+        const haystack = [p.nombre, p.descripcion, p.descripcion_corta].join(' ').toLowerCase();
+        const brand    = (p.marca || p.brand || '').toLowerCase();
+        const hasKeyword = PRINT_KEYWORDS.some(kw => haystack.includes(kw));
+        const hasAllowedBrand = ALLOWED_BRANDS.some(b => brand.includes(b));
 
-        return isAllowedCategory || isAllowedBrand;
+        return hasKeyword && hasAllowedBrand;
     });
 
     console.log(`[CT] Filtrado "Ahorro": ${filtered.length} productos relevantes (de ${products.length})`);
@@ -198,36 +217,56 @@ export function extractPrinterModels(text = '') {
 }
 
 // ── Detecta categoría normalizada ─────────────────────────────────────────────
+// Usa subcategoria (FTP) con fallback a keywords en nombre/descripción
 export function detectCategory(p) {
-    const hay = [p.nombre, p.descripcion, p.tipoproducto, p.subcategoria]
+    const sub = (p.subcategoria || '').toLowerCase();
+
+    if (sub.includes('drum') || sub.includes('tambor'))       return 'Drum';
+    if (sub.includes('tóner') || sub.includes('toner'))       return 'Toner';
+    if (sub.includes('ribbon') || sub.includes('cinta'))      return 'Ribbon';
+    if (sub.includes('cartucho') || sub.includes('tinta'))    return 'Cartucho';
+
+    // Fallback para catálogo HTTP
+    const hay = [p.nombre, p.descripcion, p.descripcion_corta, p.tipoproducto]
         .join(' ').toLowerCase();
 
-    if (hay.includes('drum') || hay.includes('tambor')) return 'Drum';
-    if (hay.includes('toner') || hay.includes('tóner'))  return 'Toner';
-    if (hay.includes('ribbon') || hay.includes('cinta')) return 'Ribbon';
+    if (hay.includes('drum') || hay.includes('tambor'))       return 'Drum';
+    if (hay.includes('toner') || hay.includes('tóner'))       return 'Toner';
+    if (hay.includes('ribbon') || hay.includes('cinta'))      return 'Ribbon';
     if (hay.includes('cartucho') || hay.includes('tinta') || hay.includes('ink')) return 'Cartucho';
     return 'Consumible';
+}
+
+// ── Normaliza precio a MXN ────────────────────────────────────────────────────
+function normalizePriceMXN(p) {
+    const precio     = parseFloat(p.precio ?? p.precioLista ?? p.price ?? 0) || 0;
+    if (!precio) return null;
+    const moneda     = (p.moneda || 'MXN').toUpperCase();
+    const tipoCambio = parseFloat(p.tipoCambio || 0) || 17.5;
+    const mxn = moneda === 'USD' ? precio * tipoCambio : precio;
+    return parseFloat(mxn.toFixed(2));
 }
 
 // ── Mapeo CT → Product schema de Supabase ────────────────────────────────────
 export function mapCTProductToSchema(p, providerId) {
     const stock = normalizeStock(p.existencia ?? p.stock ?? p.cantidad ?? 0);
-    const description = `${p.nombre || ''} ${p.descripcion || ''}`.trim();
+    // FTP usa descripcion_corta; HTTP usa descripcion
+    const description = [p.nombre, p.descripcion_corta, p.descripcion]
+        .filter(Boolean).join(' ').trim();
 
     return {
         sku:               (p.clave || p.codigo || p.sku || '').trim().toUpperCase(),
-        name:              p.nombre || p.descripcion || p.clave || 'Sin nombre',
+        name:              p.nombre || p.descripcion_corta || p.descripcion || p.clave || 'Sin nombre',
         brand:             (p.marca || p.brand || 'Sin marca').trim(),
         category:          detectCategory(p),
         color:             p.color || null,
         yield:             parseInt(p.rendimiento || p.yield || 0) || null,
         compatibility:     extractPrinterModels(description),
         availabilityStatus: stock > 0 ? 'IN_STOCK' : 'ON_DEMAND',
+        priceMXN:          normalizePriceMXN(p),
+        image:             p.imagen || p.image || null,
         providerId,
         providerSku:       (p.clave || p.codigo || '').trim(),
         weightKg:          parseFloat(p.peso || 0) || 0.5,
-        // CT-specific extras (stored for reference)
-        _ctPrice:          normalizePrice(p),
-        _ctStock:          stock,
     };
 }

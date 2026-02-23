@@ -15,6 +15,7 @@ import {
     filterAhorroProducts,
     mapCTProductToSchema,
 } from '../services/ctService.js';
+import { downloadCTCatalogViaFTP } from '../services/ftpService.js';
 import { generateBundlesFromDB } from '../services/bundleGenerator.js';
 
 const prisma = new PrismaClient();
@@ -39,8 +40,15 @@ export async function runCTSync() {
     console.log(`[CronSync ${ts}] Iniciando sincronización automática CT...`);
 
     try {
-        const token    = await getCTToken();
-        const rawData  = await getCTExistencia(token);
+        // FTP primario; HTTP API como fallback
+        let rawData;
+        try {
+            rawData = await downloadCTCatalogViaFTP();
+        } catch (ftpErr) {
+            console.warn(`[CronSync] FTP falló (${ftpErr.message}), usando HTTP API...`);
+            const token = await getCTToken();
+            rawData = await getCTExistencia(token);
+        }
         const filtered = filterAhorroProducts(rawData);
 
         if (filtered.length === 0) {
@@ -68,6 +76,8 @@ export async function runCTSync() {
                     yield:             mapped.yield,
                     compatibility:     mapped.compatibility,
                     availabilityStatus: mapped.availabilityStatus,
+                    priceMXN:          mapped.priceMXN,
+                    image:             mapped.image,
                     providerId:        mapped.providerId,
                     providerSku:       mapped.providerSku,
                     weightKg:          mapped.weightKg,
