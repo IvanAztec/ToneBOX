@@ -21,6 +21,7 @@ import subscriptionRoutes from './routes/subscriptions.js';
 import catalogRoutes from './routes/catalog.js';
 import paymentRoutes from './routes/payments.js';
 import adminRoutes from './routes/admin.js';
+import { startCTSyncJob } from './jobs/ctSyncJob.js';
 
 const app = express();
 
@@ -93,12 +94,15 @@ app.use(errorHandler);
 const server = app.listen(config.port, () => {
   console.log(`
   🚀 Server is running!
-  
+
   Environment: ${config.env}
   Port: ${config.port}
   API: http://localhost:${config.port}${config.apiPrefix}
   Health: http://localhost:${config.port}/health
   `);
+
+  // Start CT Online automatic sync (every 4 hours)
+  startCTSyncJob();
 });
 
 // Graceful Shutdown
