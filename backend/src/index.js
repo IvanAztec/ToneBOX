@@ -20,6 +20,7 @@ import productRoutes from './routes/products.js';
 import subscriptionRoutes from './routes/subscriptions.js';
 import catalogRoutes from './routes/catalog.js';
 import paymentRoutes from './routes/payments.js';
+import adminRoutes from './routes/admin.js';
 
 const app = express();
 
@@ -71,6 +72,7 @@ apiRouter.use('/products', productRoutes);
 apiRouter.use('/subscriptions', subscriptionRoutes);
 apiRouter.use('/catalog', catalogRoutes);
 apiRouter.use('/payments', paymentRoutes);
+apiRouter.use('/admin', adminRoutes);
 
 app.use(config.apiPrefix, apiRouter);
 
