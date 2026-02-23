@@ -104,11 +104,18 @@ export function Providers({ children }: { children: ReactNode }) {
     let isMounted = true;
 
     const checkAuth = async () => {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        if (isMounted) setIsLoading(false);
+        return;
+      }
       try {
-        const response = await fetch('/api/auth/me');
+        const response = await fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (response.ok && isMounted) {
-          const userData = await response.json();
-          setUser(userData);
+          const data = await response.json();
+          setUser(data.data || data);
         }
       } catch (error) {
         console.error('Auth check failed:', error);
