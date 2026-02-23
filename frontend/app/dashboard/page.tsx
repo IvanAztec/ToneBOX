@@ -1,105 +1,61 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Users,
   DollarSign,
   Activity,
-  TrendingUp,
-  ArrowUpRight,
-  ArrowDownRight,
-  MoreHorizontal,
+  ShoppingBag,
+  Loader2,
 } from 'lucide-react';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 
-interface StatCard {
-  title: string;
-  value: string;
-  change: string;
-  changeType: 'positive' | 'negative';
-  icon: React.ComponentType<{ className?: string }>;
-}
-
-const stats: StatCard[] = [
-  {
-    title: 'Total Revenue',
-    value: '$45,231.89',
-    change: '+20.1%',
-    changeType: 'positive',
-    icon: DollarSign,
-  },
-  {
-    title: 'Active Users',
-    value: '2,350',
-    change: '+180',
-    changeType: 'positive',
-    icon: Users,
-  },
-  {
-    title: 'Active Sessions',
-    value: '1,247',
-    change: '-5.4%',
-    changeType: 'negative',
-    icon: Activity,
-  },
-  {
-    title: 'Growth Rate',
-    value: '+12.5%',
-    change: '+2.3%',
-    changeType: 'positive',
-    icon: TrendingUp,
-  },
-];
-
-interface RecentActivity {
+interface Order {
   id: string;
-  user: string;
-  action: string;
-  timestamp: string;
-  avatar: string;
+  folio: string;
+  productName: string;
+  amount: number;
+  status: string;
+  paymentMethod: string;
+  clientName?: string | null;
+  createdAt: string;
 }
 
-const recentActivity: RecentActivity[] = [
-  {
-    id: '1',
-    user: 'Sarah Chen',
-    action: 'Upgraded to Pro plan',
-    timestamp: '2 minutes ago',
-    avatar: 'SC',
-  },
-  {
-    id: '2',
-    user: 'Mike Johnson',
-    action: 'Created new workspace',
-    timestamp: '15 minutes ago',
-    avatar: 'MJ',
-  },
-  {
-    id: '3',
-    user: 'Emily Davis',
-    action: 'Invited 3 team members',
-    timestamp: '1 hour ago',
-    avatar: 'ED',
-  },
-  {
-    id: '4',
-    user: 'Alex Rivera',
-    action: 'Completed onboarding',
-    timestamp: '2 hours ago',
-    avatar: 'AR',
-  },
-  {
-    id: '5',
-    user: 'Jordan Lee',
-    action: 'Updated billing info',
-    timestamp: '3 hours ago',
-    avatar: 'JL',
-  },
-];
+interface DashboardStats {
+  totalRevenue: number;
+  totalOrders: number;
+  pendingOrders: number;
+  recentOrders: Order[];
+}
+
+const STATUS_LABEL: Record<string, { label: string; color: string }> = {
+  PENDING: { label: 'Pendiente', color: 'text-yellow-600 bg-yellow-50' },
+  PAID: { label: 'Pagado', color: 'text-green-600 bg-green-50' },
+  CANCELLED: { label: 'Cancelado', color: 'text-red-600 bg-red-50' },
+};
 
 export default function DashboardPage() {
-  const handleMoreClick = useCallback(() => {
-    // Handle more options click
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/payments/orders')
+      .then(r => r.json())
+      .then(data => {
+        if (data.items) {
+          const orders: Order[] = data.items;
+          const paid = orders.filter(o => o.status === 'PAID');
+          setStats({
+            totalRevenue: paid.reduce((sum, o) => sum + o.amount, 0),
+            totalOrders: orders.length,
+            pendingOrders: orders.filter(o => o.status === 'PENDING').length,
+            recentOrders: orders.slice(0, 5),
+          });
+        } else {
+          setStats({ totalRevenue: 0, totalOrders: 0, pendingOrders: 0, recentOrders: [] });
+        }
+      })
+      .catch(() => setStats({ totalRevenue: 0, totalOrders: 0, pendingOrders: 0, recentOrders: [] }))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
@@ -108,126 +64,108 @@ export default function DashboardPage() {
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600 mt-1">
-            Welcome back! Here&apos;s what&apos;s happening with your business.
-          </p>
+          <p className="text-gray-600 mt-1">Panel de control ToneBOX.</p>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat) => (
-            <div
-              key={stat.title}
-              className="bg-white rounded-xl border border-gray-100 p-6 hover:shadow-lg transition-shadow"
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center">
-                  <stat.icon className="w-5 h-5 text-primary-600" />
-                </div>
-                <span
-                  className={`flex items-center gap-1 text-sm font-medium ${
-                    stat.changeType === 'positive' ? 'text-green-600' : 'text-red-600'
-                  }`}
-                >
-                  {stat.changeType === 'positive' ? (
-                    <ArrowUpRight className="w-4 h-4" />
-                  ) : (
-                    <ArrowDownRight className="w-4 h-4" />
-                  )}
-                  {stat.change}
-                </span>
-              </div>
-              <div className="mt-4">
-                <h3 className="text-2xl font-bold text-gray-900">{stat.value}</h3>
-                <p className="text-sm text-gray-600 mt-1">{stat.title}</p>
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Revenue */}
+          <div className="bg-white rounded-xl border border-gray-100 p-6 hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-green-600" />
               </div>
             </div>
-          ))}
-        </div>
-
-        {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Revenue Chart */}
-          <div className="bg-white rounded-xl border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-gray-900">Revenue Overview</h2>
-              <select className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent">
-                <option>Last 7 days</option>
-                <option>Last 30 days</option>
-                <option>Last 90 days</option>
-              </select>
-            </div>
-            <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-              <div className="text-center">
-                <Activity className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                <p className="text-gray-500">Chart component placeholder</p>
-                <p className="text-sm text-gray-400">Integrate your preferred charting library</p>
-              </div>
-            </div>
+            {loading ? (
+              <div className="h-8 w-32 bg-gray-100 rounded animate-pulse" />
+            ) : (
+              <h3 className="text-2xl font-bold text-gray-900">
+                ${stats?.totalRevenue.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN
+              </h3>
+            )}
+            <p className="text-sm text-gray-500 mt-1">Ingresos confirmados</p>
           </div>
 
-          {/* User Growth Chart */}
-          <div className="bg-white rounded-xl border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-gray-900">User Growth</h2>
-              <select className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent">
-                <option>Last 7 days</option>
-                <option>Last 30 days</option>
-                <option>Last 90 days</option>
-              </select>
-            </div>
-            <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-              <div className="text-center">
-                <TrendingUp className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                <p className="text-gray-500">Chart component placeholder</p>
-                <p className="text-sm text-gray-400">Integrate your preferred charting library</p>
+          {/* Total Orders */}
+          <div className="bg-white rounded-xl border border-gray-100 p-6 hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+                <ShoppingBag className="w-5 h-5 text-blue-600" />
               </div>
             </div>
+            {loading ? (
+              <div className="h-8 w-16 bg-gray-100 rounded animate-pulse" />
+            ) : (
+              <h3 className="text-2xl font-bold text-gray-900">{stats?.totalOrders ?? 0}</h3>
+            )}
+            <p className="text-sm text-gray-500 mt-1">Órdenes totales</p>
+          </div>
+
+          {/* Pending Orders */}
+          <div className="bg-white rounded-xl border border-gray-100 p-6 hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 rounded-lg bg-yellow-50 flex items-center justify-center">
+                <Activity className="w-5 h-5 text-yellow-600" />
+              </div>
+            </div>
+            {loading ? (
+              <div className="h-8 w-16 bg-gray-100 rounded animate-pulse" />
+            ) : (
+              <h3 className="text-2xl font-bold text-gray-900">{stats?.pendingOrders ?? 0}</h3>
+            )}
+            <p className="text-sm text-gray-500 mt-1">Órdenes pendientes</p>
           </div>
         </div>
 
-        {/* Recent Activity */}
+        {/* Recent Orders */}
         <div className="bg-white rounded-xl border border-gray-100">
           <div className="px-6 py-4 border-b border-gray-100">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Órdenes Recientes</h2>
           </div>
-          <div className="divide-y divide-gray-100">
-            {recentActivity?.length > 0 ? (
-              recentActivity.map((activity) => (
-                <div
-                  key={activity.id}
-                  className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-medium text-sm">
-                      {activity.avatar}
-                    </div>
+
+          {loading ? (
+            <div className="px-6 py-12 flex items-center justify-center">
+              <Loader2 className="w-6 h-6 text-gray-300 animate-spin" />
+            </div>
+          ) : stats?.recentOrders.length === 0 ? (
+            <div className="px-6 py-12 text-center">
+              <ShoppingBag className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+              <p className="text-gray-500 font-medium">Sin órdenes aún</p>
+              <p className="text-sm text-gray-400 mt-1">
+                Las órdenes SPEI y Stripe aparecerán aquí en tiempo real.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {stats?.recentOrders.map(order => {
+                const s = STATUS_LABEL[order.status] ?? { label: order.status, color: 'text-gray-600 bg-gray-50' };
+                return (
+                  <div key={order.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
                     <div>
-                      <p className="font-medium text-gray-900">{activity.user}</p>
-                      <p className="text-sm text-gray-600">{activity.action}</p>
+                      <p className="font-semibold text-gray-900">{order.folio}</p>
+                      <p className="text-sm text-gray-500">{order.productName}</p>
+                      {order.clientName && (
+                        <p className="text-xs text-gray-400">{order.clientName}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4 text-right">
+                      <div>
+                        <p className="font-bold text-gray-900">
+                          ${order.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-xs text-gray-400">{order.paymentMethod}</p>
+                      </div>
+                      <span className={`text-xs font-bold px-2 py-1 rounded-lg ${s.color}`}>
+                        {s.label}
+                      </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm text-gray-500">{activity.timestamp}</span>
-                    <button
-                      onClick={handleMoreClick}
-                      className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                    >
-                      <MoreHorizontal className="w-5 h-5 text-gray-400" />
-                    </button>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="px-6 py-12 text-center">
-                <Activity className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                <p className="text-gray-500">No recent activity</p>
-              </div>
-            )}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </DashboardLayout>
   );
 }
-

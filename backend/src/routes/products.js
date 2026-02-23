@@ -7,6 +7,44 @@ const router = express.Router();
 const prisma = new PrismaClient();
 
 /**
+ * @route GET /api/products
+ * @desc List all available products (not OUT_OF_STOCK)
+ */
+router.get('/', async (req, res) => {
+    try {
+        const products = await prisma.product.findMany({
+            where: { availabilityStatus: { not: 'OUT_OF_STOCK' } },
+            include: { provider: { select: { name: true, code: true } } },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+        });
+        res.json({ total: products.length, items: products });
+    } catch (error) {
+        if (error.code === 'P2021') return res.json({ total: 0, items: [] });
+        console.error('Products list error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * @route GET /api/products/bundles
+ * @desc List all active Duo Pack bundles
+ */
+router.get('/bundles', async (req, res) => {
+    try {
+        const bundles = await prisma.productBundle.findMany({
+            where: { availabilityStatus: { not: 'OUT_OF_STOCK' } },
+            orderBy: { createdAt: 'desc' },
+        });
+        res.json({ total: bundles.length, items: bundles });
+    } catch (error) {
+        if (error.code === 'P2021') return res.json({ total: 0, items: [] });
+        console.error('Bundles list error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
  * @route GET /api/products/search
  * @desc Search products and log results with market intelligence validation
  */

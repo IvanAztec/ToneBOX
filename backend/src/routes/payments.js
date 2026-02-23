@@ -169,4 +169,22 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
     res.json({ received: true });
 });
 
+/**
+ * GET /api/payments/orders  (Admin dashboard)
+ * Lista todas las órdenes para el panel de control.
+ */
+router.get('/orders', async (req, res) => {
+    try {
+        const orders = await prisma.order.findMany({
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+        });
+        res.json({ total: orders.length, items: orders });
+    } catch (error) {
+        if (error.code === 'P2021') return res.json({ total: 0, items: [] });
+        console.error('Orders list error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 export default router;
