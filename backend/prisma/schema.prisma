@@ -293,6 +293,7 @@ model Product {
   yield              Int?      // Rendimiento de páginas
   compatibility      String[]  @default([]) // Modelos de impresoras compatibles
   availabilityStatus String    @default("IN_STOCK") // IN_STOCK | ON_DEMAND | OUT_OF_STOCK
+  productType String    @default("ORIGINAL")   // ORIGINAL | COMPATIBLE | HARDWARE
   priceMXN    Float?   // Precio en MXN (calculado al ingestar)
   image       String?  // URL imagen CT
 

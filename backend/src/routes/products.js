@@ -68,11 +68,28 @@ router.get('/search', async (req, res) => {
         if (brand) where.brand = brand;
         if (category) where.category = category;
 
-        // Execute search
-        const products = await prisma.product.findMany({
+        // Execute search — include provider for tier classification
+        const rawProducts = await prisma.product.findMany({
             where,
+            include: { provider: { select: { name: true, code: true } } },
             take: 20,
         });
+
+        // ── Tier classification ───────────────────────────────────────────────
+        // AHORRO_VIP: BOP / CADTONER (Compatibles estratégicos)
+        // PREMIUM:    CT / UNICOM (Originales + HP exclusivo)
+        const AHORRO_PROVIDERS = new Set(['BOP', 'BOP-MX', 'CADTONER']);
+        const products = rawProducts
+            .map(p => ({
+                ...p,
+                tier: AHORRO_PROVIDERS.has(p.provider?.code) ? 'AHORRO_VIP' : 'PREMIUM',
+            }))
+            // Sort: COMPATIBLE (AHORRO_VIP) first, then ORIGINAL (PREMIUM)
+            .sort((a, b) => {
+                if (a.tier === 'AHORRO_VIP' && b.tier !== 'AHORRO_VIP') return -1;
+                if (a.tier !== 'AHORRO_VIP' && b.tier === 'AHORRO_VIP') return 1;
+                return 0;
+            });
 
         const count = products.length;
 

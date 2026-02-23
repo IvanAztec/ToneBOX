@@ -174,10 +174,16 @@ function normalizeStock(existencia) {
 }
 
 // ── Filtra SOLO consumibles de impresión ─────────────────────────────────────
+// REGLA ANTI-HP: HP está PROHIBIDO desde CT. Exclusivo de UNICOM.
 export function filterAhorroProducts(products) {
     const filtered = products.filter(p => {
         const stock = normalizeStock(p.existencia ?? p.stock ?? p.cantidad ?? 0);
         if (stock <= 0) return false;
+
+        // ── REGLA ANTI-HP CT ──────────────────────────────────────────────────
+        // Toda la línea HP se alimenta exclusivamente de UNICOM. Ignorar de CT.
+        const brand = (p.marca || p.brand || '').toLowerCase();
+        if (brand.includes('hp') || brand.includes('hewlett')) return false;
 
         // Prioridad 1: subcategoría exacta del catálogo FTP (más preciso)
         const sub = (p.subcategoria || '').toLowerCase().trim();
@@ -191,8 +197,7 @@ export function filterAhorroProducts(products) {
 
         // Prioridad 3: keyword en nombre/descripción + marca de impresión conocida
         const haystack = [p.nombre, p.descripcion, p.descripcion_corta].join(' ').toLowerCase();
-        const brand    = (p.marca || p.brand || '').toLowerCase();
-        const hasKeyword = PRINT_KEYWORDS.some(kw => haystack.includes(kw));
+        const hasKeyword      = PRINT_KEYWORDS.some(kw => haystack.includes(kw));
         const hasAllowedBrand = ALLOWED_BRANDS.some(b => brand.includes(b));
 
         return hasKeyword && hasAllowedBrand;
@@ -263,6 +268,7 @@ export function mapCTProductToSchema(p, providerId) {
         yield:             parseInt(p.rendimiento || p.yield || 0) || null,
         compatibility:     extractPrinterModels(description),
         availabilityStatus: stock > 0 ? 'IN_STOCK' : 'ON_DEMAND',
+        productType:       'ORIGINAL',
         priceMXN:          normalizePriceMXN(p),
         image:             p.imagen || p.image || null,
         providerId,

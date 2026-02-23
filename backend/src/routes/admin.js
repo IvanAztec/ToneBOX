@@ -1,9 +1,11 @@
 /**
- * ADMIN ROUTES — Ingesta de datos CT Online
+ * ADMIN ROUTES — Ingesta de datos CT Online + Importación proveedores
  *
- * POST /api/admin/ct/ingest  → Descarga catálogo CT, upsert en Supabase, genera bundles
- * GET  /api/admin/ct/test    → Verifica conexión con CT (solo token)
- * GET  /api/admin/ct/status  → Resumen de productos y bundles en DB
+ * POST /api/admin/ct/ingest              → Descarga catálogo CT, upsert en Supabase, genera bundles
+ * GET  /api/admin/ct/test                → Verifica conexión con CT (solo token)
+ * GET  /api/admin/ct/status              → Resumen de productos y bundles en DB
+ * POST /api/admin/providers/:code/import → Importa Excel/CSV de BOP, CADTONER, UNICOM
+ * GET  /api/admin/providers              → Lista proveedores activos con conteo de productos
  */
 
 import express from 'express';
@@ -16,6 +18,7 @@ import {
 } from '../services/ctService.js';
 import { downloadCTCatalogViaFTP } from '../services/ftpService.js';
 import { generateBundlesFromDB } from '../services/bundleGenerator.js';
+import { importProviderCatalog } from '../services/providerImportService.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -94,6 +97,7 @@ router.post('/ct/ingest', async (req, res) => {
                     yield:             mapped.yield,
                     compatibility:     mapped.compatibility,
                     availabilityStatus: mapped.availabilityStatus,
+                    productType:       mapped.productType,
                     priceMXN:          mapped.priceMXN,
                     image:             mapped.image,
                     providerId:        mapped.providerId,
@@ -180,6 +184,70 @@ router.get('/ct/status', async (req, res) => {
         }
         res.status(500).json({ error: error.message });
     }
+});
+
+// ── GET /api/admin/providers ──────────────────────────────────────────────────
+router.get('/providers', async (req, res) => {
+    try {
+        const providers = await prisma.provider.findMany({
+            where: { active: true },
+            include: { _count: { select: { products: true } } },
+            orderBy: { code: 'asc' },
+        });
+
+        res.json({
+            total: providers.length,
+            providers: providers.map(p => ({
+                id:           p.id,
+                name:         p.name,
+                code:         p.code,
+                dispatchType: p.dispatchType,
+                products:     p._count.products,
+                active:       p.active,
+            })),
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ── POST /api/admin/providers/:code/import ────────────────────────────────────
+// Acepta multipart/form-data con campo "file" (xlsx o csv)
+// curl -X POST .../api/admin/providers/BOP/import -F "file=@catalogo_bop.xlsx"
+router.post('/providers/:code/import', async (req, res) => {
+    const { code } = req.params;
+    const ALLOWED_CODES = ['BOP', 'BOP-MX', 'CADTONER', 'UNICOM'];
+
+    if (!ALLOWED_CODES.includes(code.toUpperCase())) {
+        return res.status(400).json({
+            error: `Código de proveedor no soportado: ${code}. Permitidos: ${ALLOWED_CODES.join(', ')}`,
+        });
+    }
+
+    // Leer body raw como Buffer (Express json/urlencoded no aplica aquí)
+    // Se espera que el cliente envíe el archivo como application/octet-stream
+    // con header X-Filename indicando el nombre del archivo.
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', async () => {
+        const buffer = Buffer.concat(chunks);
+        const filename = req.headers['x-filename'] || 'catalogo.xlsx';
+
+        if (buffer.length === 0) {
+            return res.status(400).json({ error: 'Body vacío. Envía el archivo como application/octet-stream.' });
+        }
+
+        try {
+            const result = await importProviderCatalog(buffer, filename, code.toUpperCase());
+            res.json({ success: true, ...result });
+        } catch (err) {
+            console.error(`[Import ${code}] Error:`, err.message);
+            res.status(500).json({ success: false, error: err.message });
+        }
+    });
+    req.on('error', err => {
+        res.status(500).json({ error: err.message });
+    });
 });
 
 export default router;

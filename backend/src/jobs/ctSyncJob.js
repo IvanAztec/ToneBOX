@@ -76,6 +76,7 @@ export async function runCTSync() {
                     yield:             mapped.yield,
                     compatibility:     mapped.compatibility,
                     availabilityStatus: mapped.availabilityStatus,
+                    productType:       mapped.productType,
                     priceMXN:          mapped.priceMXN,
                     image:             mapped.image,
                     providerId:        mapped.providerId,
