@@ -3,7 +3,8 @@
 import React, { useState, useRef } from 'react';
 import {
     CreditCard, Landmark, CheckCircle2, ShieldCheck, Zap,
-    Upload, Copy, ExternalLink, Loader2, Check, AlertCircle, FileText
+    Upload, Copy, ExternalLink, Loader2, Check, AlertCircle, FileText,
+    PackageSearch, ArrowLeft,
 } from 'lucide-react';
 
 interface PaymentGatewayProps {
@@ -80,16 +81,40 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
         }
     };
 
+    // ── Estado vacío: ningún bundle seleccionado ──────────────────────────────
+    if (basePrice === 0) {
+        return (
+            <div className="bg-white rounded-[2rem] shadow-2xl shadow-gray-200/60 border border-gray-100 p-8 flex flex-col items-center justify-center text-center min-h-[380px]">
+                <div className="w-16 h-16 rounded-2xl bg-green-50 flex items-center justify-center mb-5">
+                    <PackageSearch className="w-8 h-8 text-green-500" />
+                </div>
+                <span className="bg-green-100 text-green-700 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
+                    Checkout ToneBOX
+                </span>
+                <h3 className="text-xl font-black text-gray-900 mb-2">Elige tu Duo Pack</h3>
+                <p className="text-sm text-gray-500 font-medium max-w-[220px] leading-relaxed">
+                    Selecciona un <strong className="text-gray-800">Bundle Compatible</strong> del panel para ver el precio y completar tu pedido.
+                </p>
+                <div className="mt-5 flex items-center gap-1.5 text-green-600 text-xs font-black">
+                    <ArrowLeft className="w-3.5 h-3.5" /> Elige tu bundle a la izquierda
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-gray-200/50 border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-[2rem] shadow-2xl shadow-gray-200/60 border border-gray-100 overflow-hidden">
 
             {/* ── Resumen de Orden ── */}
             <div className="p-8 border-b border-gray-50 bg-gray-50/50">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
-                        <Zap className="w-5 h-5 text-green-600" /> Checkout ToneBOX
-                    </h3>
-                    <span className="bg-green-100 text-green-700 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
+                <div className="flex justify-between items-start mb-5">
+                    <div>
+                        <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
+                            <Zap className="w-4 h-4 text-green-600" /> Checkout ToneBOX
+                        </h3>
+                        <p className="text-xs text-gray-500 font-medium mt-0.5 truncate max-w-[200px]">{productName}</p>
+                    </div>
+                    <span className="bg-green-100 text-green-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shrink-0">
                         SSL Activo
                     </span>
                 </div>

@@ -8,8 +8,14 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500 shadow-lg shadow-primary-500/20 group-hover:scale-110 transition-transform duration-300" />
-            <span className="font-bold text-xl text-white tracking-tight">ToneBOX</span>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/30 group-hover:scale-110 transition-transform duration-300 flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <span className="font-bold text-xl text-white tracking-tight">
+              ToneBOX <span className="text-green-400 font-black">v2.0</span>
+            </span>
           </div>
 
           <div className="flex flex-col items-center md:items-end gap-2">
@@ -24,7 +30,7 @@ export default function Footer() {
                 href="https://aztecstudio.net"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary-400 hover:text-white font-medium transition-colors duration-200 border-b border-transparent hover:border-primary-400"
+                className="text-green-400 hover:text-white font-medium transition-colors duration-200 border-b border-transparent hover:border-green-400"
               >
                 Aztec Studio.Net.
               </Link>
