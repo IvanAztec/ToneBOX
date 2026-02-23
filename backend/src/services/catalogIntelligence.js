@@ -66,13 +66,19 @@ export async function evaluateDemandThreshold(query, validation) {
  * Usado por el Admin Master Panel.
  */
 export async function getActiveCatalogAlerts() {
-    return prisma.catalogAlert.findMany({
-        where: { status: 'PENDING' },
-        orderBy: [
-            { priority: 'asc' },
-            { hitCount: 'desc' },
-        ],
-    });
+    try {
+        return await prisma.catalogAlert.findMany({
+            where: { status: 'PENDING' },
+            orderBy: [
+                { priority: 'asc' },
+                { hitCount: 'desc' },
+            ],
+        });
+    } catch (error) {
+        // P2021 = tabla no existe en producción todavía
+        if (error.code === 'P2021') return [];
+        throw error;
+    }
 }
 
 /**

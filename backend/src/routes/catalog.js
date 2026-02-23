@@ -13,7 +13,7 @@ router.get('/alerts', async (req, res) => {
         res.json({ total: alerts.length, items: alerts });
     } catch (error) {
         console.error('Catalog alerts error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(200).json({ total: 0, items: [] });
     }
 });
 
