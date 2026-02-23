@@ -7,12 +7,30 @@
  * 2. GET /existencia    → descarga catálogo completo (regenerado c/15 min)
  * 3. Filtrar categorías "Ahorro": toners, drums, cartuchos, ribbons
  * 4. Mapear al schema de Product de Supabase
+ *
+ * Proxy: Railway sale por IPs dinámicas. CT solo acepta Fixie (IPs estáticas).
+ * Se usa undici ProxyAgent cuando FIXIE_URL está definido.
  */
+
+import { ProxyAgent, fetch as undiciFetch } from 'undici';
 
 const CT_BASE_URL = process.env.CT_API_URL || 'http://connect.ctonline.mx:3001';
 const CT_CLIENTE  = process.env.CT_CLIENTE   || 'SLT0689';
 const CT_RFC      = process.env.CT_RFC       || 'AST091007ML6';
 const CT_CORREO   = process.env.CT_CORREO    || 'ventas@aztecstudio.net';
+
+// ── Fetch con proxy Fixie ─────────────────────────────────────────────────────
+// FIXIE_URL tiene el formato: http://fixie:TOKEN@velodrome.usefixie.com:80
+const FIXIE_URL = process.env.FIXIE_URL;
+
+function ctFetch(url, options = {}) {
+    if (!FIXIE_URL) {
+        console.warn('[CT] FIXIE_URL no configurado — usando fetch directo (puede fallar si CT bloquea la IP)');
+        return fetch(url, options);
+    }
+    const dispatcher = new ProxyAgent(FIXIE_URL);
+    return undiciFetch(url, { ...options, dispatcher });
+}
 
 // ── Categorías "Ahorro" permitidas ────────────────────────────────────────────
 const ALLOWED_KEYWORDS = [
@@ -28,7 +46,7 @@ const ALLOWED_BRANDS = [
 
 // ── Autenticación ─────────────────────────────────────────────────────────────
 export async function getCTToken() {
-    const response = await fetch(`${CT_BASE_URL}/cliente/token`, {
+    const response = await ctFetch(`${CT_BASE_URL}/cliente/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -54,9 +72,9 @@ export async function getCTToken() {
 
 // ── Descarga catálogo de existencias ─────────────────────────────────────────
 export async function getCTExistencia(token) {
-    const response = await fetch(`${CT_BASE_URL}/existencia`, {
+    const response = await ctFetch(`${CT_BASE_URL}/existencia`, {
         headers: {
-            'x-auth':      token,
+            'x-auth':        token,
             'Authorization': `Bearer ${token}`,
         },
     });
