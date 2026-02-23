@@ -130,12 +130,17 @@ router.get('/ct/test', async (req, res) => {
     try {
         const token = await getCTToken();
         res.json({
-            success: true,
-            message: 'Conexión con CT Internacional exitosa.',
+            success:      true,
+            message:      'Conexión con CT Internacional exitosa.',
             tokenPreview: `${token.substring(0, 20)}...`,
         });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({
+            success: false,
+            error:   error.message,
+            fixie:   process.env.FIXIE_URL ? 'configurado' : 'NO configurado',
+            ct_url:  process.env.CT_API_URL || 'http://connect.ctonline.mx:3001',
+        });
     }
 });
 

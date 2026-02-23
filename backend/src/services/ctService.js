@@ -9,27 +9,85 @@
  * 4. Mapear al schema de Product de Supabase
  *
  * Proxy: Railway sale por IPs dinámicas. CT solo acepta Fixie (IPs estáticas).
- * Se usa undici ProxyAgent cuando FIXIE_URL está definido.
+ * Usamos el módulo http nativo de Node con proxy manual (sin dependencias extra).
  */
 
-import { ProxyAgent, fetch as undiciFetch } from 'undici';
+import http from 'http';
 
 const CT_BASE_URL = process.env.CT_API_URL || 'http://connect.ctonline.mx:3001';
 const CT_CLIENTE  = process.env.CT_CLIENTE   || 'SLT0689';
 const CT_RFC      = process.env.CT_RFC       || 'AST091007ML6';
 const CT_CORREO   = process.env.CT_CORREO    || 'ventas@aztecstudio.net';
 
-// ── Fetch con proxy Fixie ─────────────────────────────────────────────────────
-// FIXIE_URL tiene el formato: http://fixie:TOKEN@velodrome.usefixie.com:80
+// ── Fetch vía HTTP proxy (Fixie) ──────────────────────────────────────────────
+// Para HTTP→HTTP el proxy recibe la URL completa en el path del request.
+// Proxy-Authorization usa Basic auth con las credenciales de Fixie.
 const FIXIE_URL = process.env.FIXIE_URL;
 
-function ctFetch(url, options = {}) {
-    if (!FIXIE_URL) {
-        console.warn('[CT] FIXIE_URL no configurado — usando fetch directo (puede fallar si CT bloquea la IP)');
-        return fetch(url, options);
-    }
-    const dispatcher = new ProxyAgent(FIXIE_URL);
-    return undiciFetch(url, { ...options, dispatcher });
+function ctFetch(targetUrl, options = {}) {
+    return new Promise((resolve, reject) => {
+        const target = new URL(targetUrl);
+        const method = (options.method || 'GET').toUpperCase();
+        const body   = options.body || null;
+        const headers = { ...(options.headers || {}) };
+
+        if (body) headers['Content-Length'] = Buffer.byteLength(body);
+
+        let reqOptions;
+
+        if (FIXIE_URL) {
+            // Salir por Fixie: conectar al proxy y pedir la URL completa
+            const proxy = new URL(FIXIE_URL);
+            const proxyAuth = Buffer.from(`${proxy.username}:${proxy.password}`).toString('base64');
+            headers['Proxy-Authorization'] = `Basic ${proxyAuth}`;
+            headers['Host'] = target.host;
+
+            reqOptions = {
+                hostname: proxy.hostname,
+                port:     parseInt(proxy.port) || 80,
+                path:     targetUrl,           // URL absoluta al proxy HTTP
+                method,
+                headers,
+            };
+            console.log(`[CT] Usando Fixie proxy → ${proxy.hostname}:${proxy.port}`);
+        } else {
+            // Sin proxy (solo funciona si Railway tiene las IPs autorizadas)
+            console.warn('[CT] FIXIE_URL no configurado — fetch directo');
+            reqOptions = {
+                hostname: target.hostname,
+                port:     parseInt(target.port) || 80,
+                path:     target.pathname + target.search,
+                method,
+                headers,
+            };
+        }
+
+        const req = http.request(reqOptions, (res) => {
+            const chunks = [];
+            res.on('data', chunk => chunks.push(chunk));
+            res.on('end', () => {
+                const raw = Buffer.concat(chunks).toString('utf8');
+                resolve({
+                    ok:     res.statusCode >= 200 && res.statusCode < 300,
+                    status: res.statusCode,
+                    text:   () => Promise.resolve(raw),
+                    json:   () => Promise.resolve(JSON.parse(raw)),
+                });
+            });
+        });
+
+        req.on('error', (err) => {
+            reject(new Error(`ctFetch error [${method} ${targetUrl}]: ${err.message}`));
+        });
+
+        req.setTimeout(15000, () => {
+            req.destroy();
+            reject(new Error(`ctFetch timeout [${method} ${targetUrl}]`));
+        });
+
+        if (body) req.write(body);
+        req.end();
+    });
 }
 
 // ── Categorías "Ahorro" permitidas ────────────────────────────────────────────
