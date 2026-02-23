@@ -12,11 +12,11 @@ const prisma = new PrismaClient();
  */
 router.get('/', async (req, res) => {
     try {
+        const limit = Math.min(parseInt(req.query.limit) || 50, 200);
         const products = await prisma.product.findMany({
-            where: { availabilityStatus: { not: 'OUT_OF_STOCK' } },
             include: { provider: { select: { name: true, code: true } } },
-            orderBy: { createdAt: 'desc' },
-            take: 50,
+            orderBy: { updatedAt: 'desc' },
+            take: limit,
         });
         res.json({ total: products.length, items: products });
     } catch (error) {
