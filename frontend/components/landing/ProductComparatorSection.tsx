@@ -5,7 +5,7 @@ import { Search, Loader2, Tag, Package, MessageCircle, ShoppingCart } from 'luci
 
 // ── Config ────────────────────────────────────────────────────────────────────
 // ⚠️  Cambia este número por el WhatsApp de ventas ToneBOX (cód. país + número)
-const WA_NUMBER      = '5215500000000';
+const WA_NUMBER      = '528441628536';
 const SHOWCASE_LIMIT = 4;
 
 const BEST_SELLER_SKUS = [

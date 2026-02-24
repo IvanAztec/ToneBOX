@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 // ⚠️ Configura tu número de WhatsApp de ventas ToneBOX
-const WA_FLOAT_NUMBER = '5215500000000';
+const WA_FLOAT_NUMBER = '528441628536';
 const WA_FLOAT_MSG    = encodeURIComponent('Hola, tengo una duda sobre ToneBOX. ¿Me pueden ayudar?');
 import Footer from '@/components/shared/Footer';
 import PaymentGateway from '@/components/checkout/PaymentGateway';
