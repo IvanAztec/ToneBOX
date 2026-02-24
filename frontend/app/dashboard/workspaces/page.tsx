@@ -9,18 +9,18 @@ const BORDER = 'rgba(255,255,255,0.08)';
 const MUTED  = '#7A8494';
 
 const SUCURSALES = [
-  { ciudad: 'Saltillo',       estado: 'Coahuila',  tipo: 'CEDI',     tel: '844 162 8536' },
-  { ciudad: 'Monterrey',      estado: 'Nuevo León', tipo: 'CT Principal', tel: '—' },
-  { ciudad: 'CDMX',           estado: 'CDMX',      tipo: 'CT Sucursal',  tel: '—' },
-  { ciudad: 'Guadalajara',    estado: 'Jalisco',    tipo: 'CT Sucursal',  tel: '—' },
-  { ciudad: 'Puebla',         estado: 'Puebla',     tipo: 'CT Sucursal',  tel: '—' },
-  { ciudad: 'Querétaro',      estado: 'Querétaro',  tipo: 'CT Sucursal',  tel: '—' },
+  { ciudad: 'Saltillo',       estado: 'Coahuila',  tipo: 'CEDI',          tel: '844 162 8536' },
+  { ciudad: 'Monterrey',      estado: 'Nuevo León', tipo: 'Hub Principal', tel: '—' },
+  { ciudad: 'CDMX',           estado: 'CDMX',      tipo: 'Punto ToneBOX', tel: '—' },
+  { ciudad: 'Guadalajara',    estado: 'Jalisco',    tipo: 'Punto ToneBOX', tel: '—' },
+  { ciudad: 'Puebla',         estado: 'Puebla',     tipo: 'Punto ToneBOX', tel: '—' },
+  { ciudad: 'Querétaro',      estado: 'Querétaro',  tipo: 'Punto ToneBOX', tel: '—' },
 ];
 
 const TIPO_STYLE: Record<string, { color: string; bg: string }> = {
-  'CEDI':         { color: GREEN,     bg: 'rgba(0,200,150,0.12)' },
-  'CT Principal': { color: '#1A6BFF', bg: 'rgba(26,107,255,0.12)' },
-  'CT Sucursal':  { color: MUTED,     bg: 'rgba(255,255,255,0.06)' },
+  'CEDI':          { color: GREEN,     bg: 'rgba(0,200,150,0.12)' },
+  'Hub Principal': { color: '#1A6BFF', bg: 'rgba(26,107,255,0.12)' },
+  'Punto ToneBOX': { color: MUTED,     bg: 'rgba(255,255,255,0.06)' },
 };
 
 export default function WorkspacesPage() {
@@ -85,7 +85,7 @@ export default function WorkspacesPage() {
         <div className="rounded-2xl overflow-hidden" style={{ background: INK2, border: `1px solid ${BORDER}` }}>
           <div className="px-6 py-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
             <h3 className="font-syne font-bold" style={{ color: 'white' }}>
-              Red de cobertura CT Internacional
+              Red de Puntos de Entrega ToneBOX
             </h3>
             <p className="text-xs mt-0.5" style={{ color: MUTED }}>
               44+ puntos de retiro gratuito en México
@@ -93,7 +93,7 @@ export default function WorkspacesPage() {
           </div>
           <div className="divide-y" style={{ borderColor: BORDER }}>
             {SUCURSALES.map(s => {
-              const style = TIPO_STYLE[s.tipo] ?? TIPO_STYLE['CT Sucursal'];
+              const style = TIPO_STYLE[s.tipo] ?? TIPO_STYLE['Punto ToneBOX'];
               return (
                 <div key={`${s.ciudad}-${s.estado}`} className="px-6 py-3.5 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">

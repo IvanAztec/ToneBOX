@@ -21,7 +21,7 @@ const NAV_CONTACT = [
   { label: 'Saltillo, Coahuila',  href: '#' },
 ];
 
-const TECH_TAGS = ['Next.js 14', 'Supabase', 'Pakke API', 'CT Internacional'];
+const TECH_TAGS = ['Next.js 14', 'Supabase', 'Stripe + SPEI', 'Red Nacional'];
 
 export default function Footer() {
   const year = new Date().getFullYear();

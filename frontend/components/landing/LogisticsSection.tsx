@@ -17,14 +17,14 @@ const POINTS = [
   {
     icon: '📍',
     color: 'rgba(0,200,150,0.12)',
-    title: 'Recoge Gratis en Sucursal CT',
-    desc: '44 sucursales en todo México. Recoge tu impresora sin pagar envío. Si no hay stock local, te la trasladan entre sucursales máximo en 24h.',
+    title: 'Recoge Gratis — Puntos ToneBOX',
+    desc: '44 puntos de entrega en todo México. Recoge tu pedido sin pagar envío. Si no hay stock local, lo trasladamos máximo en 24h.',
   },
   {
     icon: '🚀',
     color: 'rgba(255,92,40,0.12)',
-    title: 'Envío Express con Pakke',
-    desc: 'Sistema inteligente que compara FedEx, Estafeta, Redpack y Paquete Express en tiempo real. Siempre el más rápido y barato para tu código postal.',
+    title: 'Envío Express — Nuestra Red',
+    desc: 'Sistema inteligente que selecciona la paquetería más rápida y económica disponible para tu código postal. Sin complicaciones.',
   },
   {
     icon: '📦',
@@ -89,7 +89,7 @@ export default function LogisticsSection() {
             </div>
             <div className="flex items-center gap-1.5 text-[11px]" style={{ color: '#7A8494' }}>
               <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'rgba(0,200,150,0.15)', border: '1px solid rgba(0,200,150,0.3)' }} />
-              Sucursales CT
+              Puntos ToneBOX
             </div>
           </div>
         </div>

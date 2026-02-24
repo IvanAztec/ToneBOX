@@ -10,7 +10,7 @@ const TESTIMONIALS = [
     role: 'Despacho contable, Saltillo',
   },
   {
-    quote: '"Lo que más me gustó fue recoger la impresora en la sucursal CT de Monterrey. Sin esperar envío, sin pagar flete. Ahí mismo la probé antes de llevarla."',
+    quote: '"Lo que más me gustó fue recoger la impresora en el Punto de Entrega ToneBOX en Monterrey. Sin esperar envío, sin pagar flete. Ahí mismo la probé antes de llevarla."',
     initials: 'LC',
     name: 'Laura C.',
     role: 'Consultora independiente, MTY',

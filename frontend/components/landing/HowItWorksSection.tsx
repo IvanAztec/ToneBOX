@@ -11,7 +11,7 @@ const STEPS = [
     num: '// 02',
     icon: '💳',
     title: 'Paga seguro',
-    desc: 'Stripe o PayPal. Pago 100% cifrado. Facturas CFDI disponibles de inmediato subiendo tu Constancia de Situación Fiscal.',
+    desc: 'Stripe (tarjeta) o SPEI (transferencia con 4% de descuento). Pago 100% seguro. Facturas CFDI disponibles de inmediato.',
   },
   {
     num: '// 03',
@@ -23,7 +23,7 @@ const STEPS = [
     num: '// 04',
     icon: '✅',
     title: '¡Listo en tu oficina!',
-    desc: 'Recibes en tu puerta o recoges gratis en la sucursal CT más cercana. Seguimiento por WhatsApp todo el tiempo.',
+    desc: 'Recibes en tu puerta o recoges gratis en el Punto de Entrega ToneBOX más cercano. Seguimiento por WhatsApp todo el tiempo.',
   },
 ];
 

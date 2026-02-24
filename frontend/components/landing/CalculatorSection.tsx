@@ -2,8 +2,6 @@
 
 import { useState } from 'react';
 
-const WA_NUMBER = '528441628536';
-
 interface CalcResult {
   annual: number;
   monthly: number;
@@ -48,9 +46,8 @@ export default function CalculatorSection() {
     });
   }
 
-  function openWA() {
-    const msg = encodeURIComponent('¡Hola ToneBox! Acabo de calcular mi ahorro y quiero ver los combos recomendados.');
-    window.open(`https://wa.me/${WA_NUMBER}?text=${msg}`, '_blank');
+  function scrollToCombos() {
+    document.getElementById('combos')?.scrollIntoView({ behavior: 'smooth' });
   }
 
   return (
@@ -113,9 +110,13 @@ export default function CalculatorSection() {
 
             {error && <p style={{ color: '#FF5C28', fontSize: 13, marginBottom: 8 }}>{error}</p>}
 
+            <p style={{ fontSize: 11, color: '#7A8494', textAlign: 'center', marginBottom: 10 }}>
+              🔒 Pago Seguro vía SPEI o Tarjeta de Crédito/Débito
+            </p>
+
             <button
               onClick={calculate}
-              className="w-full font-syne font-bold rounded-xl transition-all hover:-translate-y-px mt-1"
+              className="w-full font-syne font-bold rounded-xl transition-all hover:-translate-y-px"
               style={{ padding: 16, background: '#00C896', color: '#0B0E14', border: 'none', fontSize: 16, cursor: 'pointer' }}
             >
               📊 Calcular mi ahorro anual
@@ -144,11 +145,11 @@ export default function CalculatorSection() {
                   ))}
                 </div>
                 <button
-                  onClick={openWA}
+                  onClick={scrollToCombos}
                   className="w-full mt-5 font-syne font-bold rounded-xl transition-all hover:-translate-y-px"
                   style={{ padding: '14px', background: '#00C896', color: '#0B0E14', border: 'none', fontSize: 14, cursor: 'pointer' }}
                 >
-                  💬 Ver combos recomendados
+                  🛒 Ver combos recomendados
                 </button>
               </div>
             )}
@@ -163,7 +164,7 @@ const selectStyle: React.CSSProperties = {
   width: '100%',
   padding: '13px 16px',
   marginBottom: 16,
-  background: 'rgba(255,255,255,0.06)',
+  background: '#161B26',
   border: '1.5px solid rgba(255,255,255,0.12)',
   borderRadius: 10,
   color: 'white',
@@ -171,6 +172,7 @@ const selectStyle: React.CSSProperties = {
   fontSize: 15,
   outline: 'none',
   appearance: 'none' as const,
+  colorScheme: 'dark',
 };
 
 function InputLabel({ children }: { children: React.ReactNode }) {

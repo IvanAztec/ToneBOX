@@ -1,7 +1,5 @@
 'use client';
 
-const WA_NUMBER = '528441628536';
-
 interface Bundle {
   id: string;
   name: string;
@@ -22,11 +20,6 @@ const BADGES = [
 ];
 
 const ICONS = ['💚', '🔥', '💼', '🏆'];
-
-function waCombo(name: string) {
-  const msg = encodeURIComponent(`¡Hola ToneBox! Me interesa el combo: ${name}. ¿Me pueden dar más información?`);
-  window.open(`https://wa.me/${WA_NUMBER}?text=${msg}`, '_blank');
-}
 
 export default function CombosSection({ bundles, onSelect }: Props) {
   const shown = bundles.slice(0, 4);
@@ -65,8 +58,7 @@ export default function CombosSection({ bundles, onSelect }: Props) {
                 price={c.price}
                 wasSaved={c.was - c.price}
                 cpp={c.cpp}
-                onWa={() => waCombo(c.name)}
-                onSelect={() => {}}
+                onSelect={() => onSelect({ id: `static-${i}`, name: c.name, description: c.desc, price: c.price })}
               />
             ))
           ) : (
@@ -79,7 +71,6 @@ export default function CombosSection({ bundles, onSelect }: Props) {
                 price={b.price ?? 0}
                 wasSaved={b.price ? Math.round(b.price * 0.149) : 0}
                 cpp="$0.14"
-                onWa={() => waCombo(b.name)}
                 onSelect={() => onSelect(b)}
               />
             ))
@@ -97,11 +88,10 @@ interface CardProps {
   price: number;
   wasSaved: number;
   cpp: string;
-  onWa: () => void;
   onSelect: () => void;
 }
 
-function ComboCard({ index, name, desc, price, wasSaved, cpp, onWa, onSelect }: CardProps) {
+function ComboCard({ index, name, desc, price, wasSaved, cpp, onSelect }: CardProps) {
   const isFeatured = index === 1;
   const badge = BADGES[index] ?? BADGES[0];
   const icon = ICONS[index] ?? '🖨️';
@@ -155,7 +145,7 @@ function ComboCard({ index, name, desc, price, wasSaved, cpp, onWa, onSelect }: 
 
       {/* CTA */}
       <button
-        onClick={onWa}
+        onClick={onSelect}
         className="w-full py-3.5 rounded-xl font-syne font-bold transition-all hover:-translate-y-px"
         style={{
           background: '#00C896',
@@ -166,7 +156,7 @@ function ComboCard({ index, name, desc, price, wasSaved, cpp, onWa, onSelect }: 
           boxShadow: isFeatured ? '0 8px 24px rgba(0,200,150,0.3)' : undefined,
         }}
       >
-        🛒 Quiero este combo
+        🛒 Seleccionar combo
       </button>
     </div>
   );
