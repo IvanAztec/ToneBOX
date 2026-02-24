@@ -2,55 +2,92 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design tokens ─────────────────────────────────── */
+:root {
+  --ink:      #0B0E14;
+  --ink2:     #161B26;
+  --green:    #00C896;
+  --green-d:  #00A07A;
+  --orange:   #FF5C28;
+  --blue:     #1A6BFF;
+  --muted:    #7A8494;
+  --border:   rgba(255, 255, 255, 0.08);
+}
+
+/* ── Base ──────────────────────────────────────────── */
 @layer base {
-  * {
-    border-color: theme('colors.gray.200');
-  }
-  
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
+    font-family: var(--font-dm-sans, 'DM Sans', sans-serif);
+    background: var(--ink);
+    color: white;
+    overflow-x: hidden;
   }
+  a { text-decoration: none; color: inherit; }
+  img { max-width: 100%; display: block; }
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+/* ── Font helpers ──────────────────────────────────── */
+.font-syne { font-family: var(--font-syne, 'Syne', sans-serif) !important; }
+.font-mono  { font-family: var(--font-space-mono, 'Space Mono', monospace) !important; }
+
+/* ── Keyframe animations ───────────────────────────── */
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+@keyframes pulse-dot {
+  0%,100% { box-shadow: 0 0 0 0 rgba(0, 200, 150, 0.4); }
+  50%      { box-shadow: 0 0 0 8px rgba(0, 200, 150, 0); }
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
+@keyframes float {
+  0%,100% { transform: translateY(0px); }
+  50%      { transform: translateY(-8px); }
 }
 
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+/* ── Animation utility classes ─────────────────────── */
+.animate-ticker    { animation: ticker 28s linear infinite; }
+.animate-pulse-dot { animation: pulse-dot 2.5s ease infinite; }
+.animate-float     { animation: float 4s ease-in-out infinite; }
+.anim-1            { animation: fadeUp 0.7s ease both; }
+.anim-2            { animation: fadeUp 0.7s 0.15s ease both; }
+.anim-3            { animation: fadeUp 0.7s 0.30s ease both; }
+.anim-4            { animation: fadeUp 0.7s 0.45s ease both; }
+
+/* ── Hero grid background ──────────────────────────── */
+.hero-grid-bg {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black, transparent);
 }
 
-/* Focus ring */
-.focus-ring {
-  @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+/* ── Section border top (green glow) ───────────────── */
+.section-border-top::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 200, 150, 0.4), transparent);
 }
 
-/* Glass morphism effect */
-.glass {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+.section-border-bottom::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(26, 107, 255, 0.4), transparent);
 }
 
-/* Gradient text */
-.gradient-text {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-500 to-accent-500;
-}
-
+/* ── Custom scrollbar ──────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 200, 150, 0.4); }

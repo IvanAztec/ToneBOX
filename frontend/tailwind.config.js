@@ -37,8 +37,9 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
-        mono: ['ui-monospace', 'SFMono-Regular', 'monospace'],
+        sans:  ['var(--font-dm-sans)', 'DM Sans', 'system-ui', 'sans-serif'],
+        syne:  ['var(--font-syne)', 'Syne', 'sans-serif'],
+        mono:  ['var(--font-space-mono)', 'Space Mono', 'ui-monospace', 'monospace'],
       },
       animation: {
         'fade-in':  'fadeIn 0.5s ease-in-out',

@@ -2,29 +2,26 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import {
-  ArrowRight, ArrowLeft, Shield, BarChart3, Zap,
-  AlertTriangle, RefreshCw, CheckCircle2, Package2, MessageCircle,
-} from 'lucide-react';
+import { BarChart3, MessageCircle } from 'lucide-react';
 
-// ⚠️ Configura tu número de WhatsApp de ventas ToneBOX
-const WA_FLOAT_NUMBER = '528441628536';
-const WA_FLOAT_MSG    = encodeURIComponent('Hola, tengo una duda sobre ToneBOX. ¿Me pueden ayudar?');
-import Footer from '@/components/shared/Footer';
-import PaymentGateway from '@/components/checkout/PaymentGateway';
-import ProductComparatorSection from '@/components/landing/ProductComparatorSection';
 import { useAuth } from '@/app/providers';
+import ToneBoxLogo from '@/components/shared/ToneBoxLogo';
+import TickerBar from '@/components/landing/TickerBar';
+import HeroSection from '@/components/landing/HeroSection';
+import CombosSection from '@/components/landing/CombosSection';
+import BrandsSection from '@/components/landing/BrandsSection';
+import ProductComparatorSection from '@/components/landing/ProductComparatorSection';
+import CalculatorSection from '@/components/landing/CalculatorSection';
+import LogisticsSection from '@/components/landing/LogisticsSection';
+import HowItWorksSection from '@/components/landing/HowItWorksSection';
+import TrustSection from '@/components/landing/TrustSection';
+import PaymentGateway from '@/components/checkout/PaymentGateway';
+import Footer from '@/components/shared/Footer';
 
-interface Bundle {
-  id: string;
-  name: string;
-  description?: string | null;
-  price?: number | null;
-  availabilityStatus: string;
-}
-
-// Modelos de alto volumen (home/office laser) — priorizados sobre industriales/plotters
-const PRIORITY_SKUS = [
+const WA_NUMBER      = '528441628536';
+const WA_FLOAT_MSG   = encodeURIComponent('Hola, tengo una duda sobre ToneBox. ¿Me pueden ayudar?');
+const MAX_PRICE      = 4500;
+const PRIORITY_SKUS  = [
   '85A','78A','05A','80A','55A','64A','12A','35A','36A','51A','53A','26A','30A','58A','87A',
   'TN-660','TN-630','TN-760','TN-227','TN-433','TN-436','TN-850','TN-880',
   'TK-1175','TK-3182','TK-5242','TK-1162','TK-5292',
@@ -32,388 +29,196 @@ const PRIORITY_SKUS = [
   'CRG-128','CRG-137','CRG-045',
 ];
 
-function scorePriority(b: Bundle): number {
+interface Bundle {
+  id: string;
+  name: string;
+  description?: string | null;
+  price?: number | null;
+}
+
+function scorePriority(b: Bundle) {
   const text = `${b.name} ${b.description ?? ''}`.toUpperCase();
   return PRIORITY_SKUS.some(k => text.includes(k.toUpperCase())) ? 1 : 0;
 }
 
-function sortBundles(items: Bundle[]): Bundle[] {
+function sortBundles(items: Bundle[]) {
   return [...items].sort((a, b) => {
-    const scoreDiff = scorePriority(b) - scorePriority(a);
-    if (scoreDiff !== 0) return scoreDiff;
-    return (a.price ?? 0) - (b.price ?? 0);
+    const d = scorePriority(b) - scorePriority(a);
+    return d !== 0 ? d : (a.price ?? 0) - (b.price ?? 0);
   });
-}
-
-const BUNDLE_LANDING_LIMIT  = 12;
-const BUNDLE_MAX_PRICE_MXN  = 4500;
-
-interface CatalogAlert {
-  id: string;
-  query: string;
-  hitCount: number;
-  priority: string;
-}
-
-const PRIORITY_CONFIG: Record<string, { label: string; className: string }> = {
-  CRITICAL: { label: 'CRÍTICO',  className: 'bg-red-100 text-red-800' },
-  HIGH:     { label: 'ALTO',     className: 'bg-orange-100 text-orange-800' },
-  MEDIUM:   { label: 'MEDIO',    className: 'bg-yellow-100 text-yellow-800' },
-};
-
-function SkeletonCard() {
-  return (
-    <div className="space-y-3">
-      <div className="h-[72px] bg-gray-100 rounded-2xl animate-pulse" />
-      <div className="h-[72px] bg-gray-100 rounded-2xl animate-pulse delay-75" />
-    </div>
-  );
 }
 
 export default function HomePage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-
-  const [bundles, setBundles]               = useState<Bundle[]>([]);
-  const [bundlesLoading, setBundlesLoading] = useState(true);
-  const [showAllBundles, setShowAllBundles] = useState(false);
-  const [alerts, setAlerts]                 = useState<CatalogAlert[]>([]);
-  const [alertsLoading, setAlertsLoading]   = useState(true);
-
-  // Checkout state — starts empty, driven by bundle selection
-  const [selectedPrice, setSelectedPrice]             = useState(0);
-  const [selectedBundleId, setSelectedBundleId]       = useState<string | null>(null);
-  const [selectedProductName, setSelectedProductName] = useState('Duo Pack ToneBOX');
+  const [bundles, setBundles]         = useState<Bundle[]>([]);
+  const [selectedPrice, setPrice]     = useState(0);
+  const [selectedBundleId, setBundId] = useState<string | null>(null);
+  const [selectedName, setName]       = useState('Duo Pack ToneBox');
+  const [scrolled, setScrolled]       = useState(false);
 
   const checkoutRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch(`/api/products/bundles?maxPrice=${BUNDLE_MAX_PRICE_MXN}`)
+    fetch(`/api/products/bundles?maxPrice=${MAX_PRICE}`)
       .then(r => r.json())
-      .then(data => setBundles(sortBundles(data.items ?? [])))
-      .catch(() => setBundles([]))
-      .finally(() => setBundlesLoading(false));
+      .then(d => setBundles(sortBundles(d.items ?? [])))
+      .catch(() => setBundles([]));
   }, []);
 
   useEffect(() => {
-    fetch('/api/catalog/alerts')
-      .then(r => r.json())
-      .then(data => setAlerts(data.items ?? []))
-      .catch(() => setAlerts([]))
-      .finally(() => setAlertsLoading(false));
+    const onScroll = () => setScrolled(window.scrollY > 60);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   function handleBundleSelect(b: Bundle) {
     if (b.price == null) return;
-    setSelectedPrice(b.price);
-    setSelectedBundleId(b.id);
-    setSelectedProductName(b.name);
-    setTimeout(() => {
-      checkoutRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 80);
+    setPrice(b.price);
+    setBundId(b.id);
+    setName(b.name);
+    setTimeout(() => checkoutRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
   }
 
-  function handleActivateVIP() {
-    const firstPriced = bundles.find(b => b.price != null);
-    if (firstPriced) {
-      handleBundleSelect(firstPriced);
-    } else {
-      checkoutRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
+  function handleProductSelect(name: string, price: number) {
+    setPrice(price);
+    setName(name);
+    setTimeout(() => checkoutRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+  }
+
+  function scrollTo(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+    <div className="min-h-screen overflow-x-hidden" style={{ background: '#0B0E14', color: 'white' }}>
 
-      {/* ── Navigation ── */}
-      <nav className="border-b bg-white/80 backdrop-blur-md sticky top-0 z-50 shadow-sm shadow-gray-100/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
+      {/* ── Fixed Nav ── */}
+      <nav
+        style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+          padding: scrolled ? '12px 0' : '20px 0',
+          background: 'rgba(11,14,20,0.85)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          transition: 'padding 0.3s',
+        }}
+      >
+        <div className="max-w-[1160px] mx-auto px-8 flex items-center justify-between">
+          <ToneBoxLogo showTagline />
 
-            {/* Logo */}
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/30 flex items-center justify-center">
-                <Zap className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-bold text-xl tracking-tight">
-                ToneBOX <span className="text-green-600 font-black">v2.0</span>
-              </span>
-            </div>
-
-            {/* Nav Actions */}
-            <div className="flex items-center gap-4">
-              {!authLoading && isAuthenticated && (
-                <Link
-                  href="/dashboard"
-                  className="hidden sm:flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-green-600 transition-colors"
+          {/* Nav links (hidden on mobile) */}
+          <ul className="hidden md:flex gap-8 list-none">
+            {[['#combos','Combos'],['#consumibles','Consumibles'],['#calculadora','Calcular ahorro'],['#logistica','Sucursales']].map(([href,label]) => (
+              <li key={href}>
+                <a href={href} style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', transition: 'color 0.2s' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.color = 'white'}
+                  onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.6)'}
                 >
-                  <BarChart3 className="w-4 h-4" /> Admin Panel
-                </Link>
-              )}
-              <Link
-                href={isAuthenticated ? '/dashboard' : '/auth/login'}
-                className="bg-gray-900 text-white px-5 py-2 rounded-full text-sm font-bold hover:bg-green-600 transition-all active:scale-95 shadow-lg shadow-gray-900/10"
-              >
-                {!authLoading && isAuthenticated ? 'Dashboard →' : 'Sign In'}
-              </Link>
-            </div>
+                  {label}
+                </a>
+              </li>
+            ))}
+          </ul>
 
+          {/* Nav CTA */}
+          <div className="flex items-center gap-3">
+            <a
+              href={`https://wa.me/${WA_NUMBER}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden sm:flex items-center gap-2 rounded-xl transition-all hover:bg-opacity-30"
+              style={{ background: 'rgba(37,211,102,0.12)', color: '#25D366', border: '1px solid rgba(37,211,102,0.25)', padding: '9px 16px', fontSize: 13, fontWeight: 500 }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+              </svg>
+              WhatsApp
+            </a>
+            {!authLoading && isAuthenticated && (
+              <Link href="/dashboard" className="flex items-center gap-1.5 transition-colors hover:text-[#00C896]" style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
+                <BarChart3 className="w-4 h-4" /> Admin
+              </Link>
+            )}
+            <a
+              href="#combos"
+              className="font-syne font-bold rounded-xl transition-all hover:-translate-y-0.5"
+              style={{ background: '#00C896', color: '#0B0E14', padding: '10px 22px', fontSize: 14 }}
+            >
+              Ver Combos
+            </a>
           </div>
         </div>
       </nav>
 
+      {/* ── Page offset for fixed nav ── */}
+      <div style={{ height: 80 }} />
+
+      {/* ── Ticker ── */}
+      <TickerBar />
+
       {/* ── Hero ── */}
-      <header className="relative pt-20 pb-36 overflow-hidden">
-        {/* Glow radial */}
-        <div className="pointer-events-none absolute inset-0 -z-10">
-          <div className="absolute left-1/2 top-0 -translate-x-1/2 w-[900px] h-[600px] bg-gradient-radial from-green-100/60 via-transparent to-transparent rounded-full blur-3xl" />
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-100 border border-green-200/80 text-green-700 text-xs font-black mb-8">
-            <Shield className="w-3 h-3" /> Atención VIP · Asesoría + Asistencia
-          </div>
-
-          <h1 className="text-5xl sm:text-6xl md:text-7xl font-black text-gray-900 leading-[1.08] mb-6 tracking-tight">
-            Tu <span className="text-green-600">Asesor</span> de Ahorro,<br />
-            tu <span className="text-emerald-500">Asistente</span> de Logística.
-          </h1>
-          <p className="text-lg sm:text-xl text-gray-500 max-w-2xl mx-auto mb-4 font-medium leading-relaxed">
-            El primer sistema que combina la inteligencia de un Asesor de optimización
-            con la eficiencia de un Asistente personal que anticipa tu demanda.
-          </p>
-          <p className="text-sm text-gray-400 mb-12 font-semibold italic">
-            "Para un flujo Sin Pausas: Tú solo imprime, nosotros nos encargamos del resto."
-          </p>
-
-          <div className="flex flex-wrap justify-center gap-3">
-            <button
-              onClick={handleActivateVIP}
-              className="bg-gray-900 text-white px-8 py-4 rounded-2xl font-bold flex items-center gap-2.5 hover:bg-green-600 transition-all shadow-2xl shadow-gray-900/20 active:scale-95"
-            >
-              Activar Asistencia VIP <ArrowRight className="w-5 h-5" />
-            </button>
-            <a
-              href="mailto:ventas@aztecstudio.net?subject=Consulta%20ToneBOX"
-              className="bg-white text-gray-900 border-2 border-gray-200 px-8 py-4 rounded-2xl font-bold hover:border-green-300 hover:shadow-md transition-all"
-            >
-              Consultar con mi Asesor
-            </a>
-          </div>
-        </div>
-      </header>
-
-      {/* ── Intelligence Widgets ── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-20 relative z-10">
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
-
-          {/* ── Bundles Widget ── */}
-          <div id="bundles-widget" className="bg-white p-7 rounded-[2rem] shadow-2xl shadow-gray-200/60 border border-gray-100 flex flex-col">
-            <div className="flex justify-between items-start mb-6">
-              <div className="w-11 h-11 rounded-2xl bg-blue-50 flex items-center justify-center">
-                <Package2 className="w-5 h-5 text-blue-600" />
-              </div>
-              <span className="bg-blue-100 text-blue-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg">
-                Duo Pack Matches
-              </span>
-            </div>
-            <h3 className="text-lg font-black mb-1">Bundles Compatibles</h3>
-            <p className="text-xs text-gray-400 font-medium mb-5">
-              Haz clic en un bundle para cargarlo al checkout →
-            </p>
-            <div className="space-y-3 flex-1">
-              {bundlesLoading ? (
-                <SkeletonCard />
-              ) : bundles.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <Package2 className="w-8 h-8 text-gray-200 mb-3" />
-                  <p className="text-sm text-gray-400 font-semibold">Sin bundles activos aún.</p>
-                  <p className="text-xs text-gray-300 mt-1">
-                    Los Duo Packs aparecerán cuando se sincronice el catálogo CT.
-                  </p>
-                </div>
-              ) : (() => {
-                const visibleBundles = showAllBundles ? bundles : bundles.slice(0, BUNDLE_LANDING_LIMIT);
-                const hasMore = bundles.length > BUNDLE_LANDING_LIMIT;
-                return (
-                  <>
-                    {visibleBundles.map(b => {
-                      const isSelected = selectedBundleId === b.id;
-                      return (
-                        <button
-                          key={b.id}
-                          onClick={() => handleBundleSelect(b)}
-                          className={`w-full p-4 rounded-2xl border-2 text-left transition-all ${
-                            isSelected
-                              ? 'border-green-500 bg-green-50/50 shadow-sm shadow-green-100'
-                              : 'border-gray-100 bg-gray-50/80 hover:border-blue-200 hover:shadow-sm'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <p className="font-black text-sm text-gray-900 leading-snug flex-1">{b.name}</p>
-                            {isSelected ? (
-                              <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
-                            ) : (
-                              <span className="text-[10px] font-black bg-green-100 text-green-700 px-1.5 py-0.5 rounded shrink-0">
-                                Ahorro 13%
-                              </span>
-                            )}
-                          </div>
-                          {b.price != null && (
-                            <p className="text-xs font-black text-blue-600 mt-1.5">
-                              ${b.price.toFixed(0)} MXN
-                            </p>
-                          )}
-                          {b.description && (
-                            <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">{b.description}</p>
-                          )}
-                        </button>
-                      );
-                    })}
-                    {hasMore && (
-                      <button
-                        onClick={() => setShowAllBundles(p => !p)}
-                        className="w-full py-2.5 rounded-2xl border-2 border-dashed border-gray-200 text-xs font-bold text-gray-400 hover:border-blue-300 hover:text-blue-500 transition-all"
-                      >
-                        {showAllBundles
-                          ? `▲ Ver menos`
-                          : `Ver todos los Duo Packs (${bundles.length - BUNDLE_LANDING_LIMIT} más)`}
-                      </button>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-          </div>
-
-          {/* ── Search Intelligence Widget ── */}
-          <div className="bg-white p-7 rounded-[2rem] shadow-2xl shadow-gray-200/60 border border-gray-100 flex flex-col">
-            <div className="flex justify-between items-start mb-6">
-              <div className="w-11 h-11 rounded-2xl bg-orange-50 flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5 text-orange-500" />
-              </div>
-              <span className="bg-orange-100 text-orange-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg">
-                Lost Opportunities
-              </span>
-            </div>
-            <h3 className="text-lg font-black mb-1">Inteligencia de Búsqueda</h3>
-            <p className="text-xs text-gray-400 font-medium mb-5">
-              Productos que tus clientes buscan y no encuentran.
-            </p>
-            <div className="space-y-3 flex-1">
-              {alertsLoading ? (
-                <SkeletonCard />
-              ) : alerts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <AlertTriangle className="w-8 h-8 text-gray-200 mb-3" />
-                  <p className="text-sm text-gray-400 font-semibold">Sin alertas activas.</p>
-                  <p className="text-xs text-gray-300 mt-1">
-                    Aparecerán cuando los clientes busquen productos inexistentes.
-                  </p>
-                </div>
-              ) : (
-                alerts.map(a => {
-                  const cfg = PRIORITY_CONFIG[a.priority] ?? PRIORITY_CONFIG['MEDIUM'];
-                  return (
-                    <div
-                      key={a.id}
-                      className="flex items-center justify-between p-4 bg-orange-50/40 rounded-2xl border border-orange-100/80"
-                    >
-                      <div>
-                        <p className="font-bold text-sm text-gray-900">{a.query}</p>
-                        <p className="text-xs text-orange-600 font-bold mt-0.5">
-                          {a.hitCount} {a.hitCount === 1 ? 'búsqueda real' : 'búsquedas reales'}
-                        </p>
-                      </div>
-                      <span className={`text-[10px] font-black px-2 py-1 rounded-lg shrink-0 ${cfg.className}`}>
-                        {cfg.label}
-                      </span>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* ── Checkout Dinámico VIP ── */}
-          <div ref={checkoutRef} className="lg:col-span-1">
-            <PaymentGateway
-              basePrice={selectedPrice}
-              productName={selectedProductName}
-            />
-          </div>
-
-        </div>
-      </section>
-
-      {/* ── Comparador de Productos por Marca ── */}
-      <ProductComparatorSection
-        onSelectProduct={(name, price) => {
-          setSelectedProductName(name);
-          setSelectedPrice(price);
-          setTimeout(() => {
-            checkoutRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          }, 80);
-        }}
+      <HeroSection
+        onCombosCta={() => scrollTo('combos')}
+        onCalcCta={() => scrollTo('calculadora')}
       />
 
-      {/* ── Features Section ── */}
-      <section className="py-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-black text-gray-900 mb-4">
-              La fábrica que trabaja <span className="text-green-600">mientras tú imprimes</span>
-            </h2>
-            <p className="text-gray-500 font-medium max-w-xl mx-auto">
-              Tres motores de inteligencia operando en paralelo, 24/7.
-            </p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-10 text-center">
-            <div className="group">
-              <div className="w-16 h-16 rounded-3xl bg-green-100 text-green-600 flex items-center justify-center mx-auto mb-5 group-hover:scale-110 transition-transform duration-300">
-                <BarChart3 className="w-8 h-8" />
-              </div>
-              <h4 className="text-lg font-black mb-2 text-gray-900">Anticipación IA</h4>
-              <p className="text-sm text-gray-500 leading-relaxed font-medium">
-                Calculamos tu tasa de consumo basada en el rendimiento real de tu modelo (Canon, Brother, Ricoh).
-              </p>
-            </div>
-            <div className="group">
-              <div className="w-16 h-16 rounded-3xl bg-green-100 text-green-600 flex items-center justify-center mx-auto mb-5 group-hover:scale-110 transition-transform duration-300">
-                <Shield className="w-8 h-8" />
-              </div>
-              <h4 className="text-lg font-black mb-2 text-gray-900">Cero Desperdicio</h4>
-              <p className="text-sm text-gray-500 leading-relaxed font-medium">
-                Recibe recordatorios de reposición 7 días antes de vaciar tu tóner. Continuidad garantizada.
-              </p>
-            </div>
-            <div className="group">
-              <div className="w-16 h-16 rounded-3xl bg-green-100 text-green-600 flex items-center justify-center mx-auto mb-5 group-hover:scale-110 transition-transform duration-300">
-                <RefreshCw className="w-8 h-8" />
-              </div>
-              <h4 className="text-lg font-black mb-2 text-gray-900">Duo Pack Logic</h4>
-              <p className="text-sm text-gray-500 leading-relaxed font-medium">
-                Combinamos Tóner y Drum automáticamente para ahorrarte hasta 13% en costos de operación.
-              </p>
-            </div>
-          </div>
-        </div>
+      {/* ── Combos (real API bundles) ── */}
+      <CombosSection bundles={bundles} onSelect={handleBundleSelect} />
+
+      {/* ── Brands ── */}
+      <BrandsSection />
+
+      {/* ── Product Comparator (search) ── */}
+      <section style={{ background: '#0B0E14' }}>
+        <ProductComparatorSection onSelectProduct={handleProductSelect} />
       </section>
 
-      {/* ── Botón flotante WhatsApp ── */}
+      {/* ── Calculator ── */}
+      <CalculatorSection />
+
+      {/* ── Logistics ── */}
+      <LogisticsSection />
+
+      {/* ── How It Works ── */}
+      <HowItWorksSection />
+
+      {/* ── Trust + Subscription + CTA ── */}
+      <TrustSection />
+
+      {/* ── Checkout (shown when product selected) ── */}
+      {selectedPrice > 0 && (
+        <section
+          ref={checkoutRef}
+          className="py-16"
+          style={{ background: '#161B26', borderTop: '1px solid rgba(0,200,150,0.2)' }}
+        >
+          <div className="max-w-xl mx-auto px-8">
+            <div className="font-mono text-[10px] tracking-[3px] uppercase mb-3 text-center" style={{ color: '#00C896' }}>
+              // Finalizar Pedido
+            </div>
+            <h2 className="font-syne font-extrabold text-center mb-8" style={{ fontSize: 28 }}>
+              {selectedName}
+            </h2>
+            <PaymentGateway basePrice={selectedPrice} productName={selectedName} />
+          </div>
+        </section>
+      )}
+
+      {/* ── Footer ── */}
+      <Footer />
+
+      {/* ── Floating WhatsApp ── */}
       <a
-        href={`https://wa.me/${WA_FLOAT_NUMBER}?text=${WA_FLOAT_MSG}`}
+        href={`https://wa.me/${WA_NUMBER}?text=${WA_FLOAT_MSG}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="fixed bottom-6 right-5 z-50 flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-bold px-4 py-3 rounded-full shadow-2xl shadow-green-500/40 transition-all hover:scale-105 active:scale-95"
+        className="fixed bottom-6 right-5 z-50 flex items-center gap-2 font-bold text-sm rounded-full shadow-2xl transition-all hover:scale-105 active:scale-95"
+        style={{ background: '#25D366', color: 'white', padding: '12px 20px', boxShadow: '0 8px 32px rgba(37,211,102,0.4)' }}
         aria-label="Chat por WhatsApp"
       >
         <MessageCircle className="w-5 h-5" />
         <span className="hidden sm:inline">¿Dudas?</span>
       </a>
-
-      <Footer />
     </div>
   );
 }

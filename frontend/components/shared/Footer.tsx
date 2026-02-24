@@ -1,47 +1,104 @@
 import Link from 'next/link';
+import ToneBoxLogo from './ToneBoxLogo';
+
+const NAV_PRODUCTS = [
+  { label: 'Combos PYME',          href: '#combos' },
+  { label: 'Toners Compatibles',   href: '#consumibles' },
+  { label: 'Tintas',               href: '#consumibles' },
+  { label: 'Duo Packs',            href: '#combos' },
+];
+
+const NAV_COMPANY = [
+  { label: 'Nosotros',            href: '#' },
+  { label: 'Sucursales',          href: '#logistica' },
+  { label: 'Facturación CFDI',    href: '#' },
+  { label: 'Garantías',           href: '#' },
+];
+
+const NAV_CONTACT = [
+  { label: 'WhatsApp',            href: 'https://wa.me/528441628536' },
+  { label: 'hola@tonebox.mx',     href: 'mailto:hola@tonebox.mx' },
+  { label: 'Saltillo, Coahuila',  href: '#' },
+];
+
+const TECH_TAGS = ['Next.js 14', 'Supabase', 'Pakke API', 'CT Internacional'];
 
 export default function Footer() {
-  const currentYear = new Date().getFullYear();
+  const year = new Date().getFullYear();
 
   return (
-    <footer className="bg-gray-900 text-gray-400 py-12 transition-all duration-300">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/30 group-hover:scale-110 transition-transform duration-300 flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <span className="font-bold text-xl text-white tracking-tight">
-              ToneBOX <span className="text-green-400 font-black">v2.0</span>
-            </span>
+    <footer style={{ background: '#161B26', borderTop: '1px solid rgba(255,255,255,0.06)', padding: '48px 0 32px' }}>
+      <div className="max-w-[1160px] mx-auto px-8">
+
+        {/* 4-column grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-10">
+          {/* Brand */}
+          <div className="col-span-2 md:col-span-1">
+            <ToneBoxLogo showTagline />
+            <p style={{ fontSize: 13, color: '#7A8494', lineHeight: 1.6, marginTop: 16, maxWidth: 260 }}>
+              Consumibles e impresoras para PYMES. Entrega en +44 ciudades de México. Ahorro garantizado desde el primer pedido.
+            </p>
           </div>
 
-          <div className="flex flex-col items-center md:items-end gap-2">
-            <p className="text-sm md:text-base text-center md:text-right">
-              © {currentYear} ToneBOX.
-            </p>
-            <p className="text-sm text-gray-500 flex items-center gap-1.5 flex-wrap justify-center md:justify-end">
-              <span>Hecho y diseñado con</span>
-              <span className="text-red-500 animate-pulse">❤️</span>
-              <span>por</span>
-              <Link
-                href="https://aztecstudio.net"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-green-400 hover:text-white font-medium transition-colors duration-200 border-b border-transparent hover:border-green-400"
-              >
-                Aztec Studio.Net.
-              </Link>
-            </p>
+          {/* Productos */}
+          <div>
+            <h4 className="font-mono text-[10px] tracking-[2px] uppercase mb-4" style={{ color: 'rgba(255,255,255,0.3)' }}>
+              Productos
+            </h4>
+            {NAV_PRODUCTS.map(l => (
+              <a key={l.label} href={l.href} className="block mb-2.5 transition-colors hover:text-white" style={{ fontSize: 13, color: '#7A8494' }}>
+                {l.label}
+              </a>
+            ))}
+          </div>
+
+          {/* Empresa */}
+          <div>
+            <h4 className="font-mono text-[10px] tracking-[2px] uppercase mb-4" style={{ color: 'rgba(255,255,255,0.3)' }}>
+              Empresa
+            </h4>
+            {NAV_COMPANY.map(l => (
+              <a key={l.label} href={l.href} className="block mb-2.5 transition-colors hover:text-white" style={{ fontSize: 13, color: '#7A8494' }}>
+                {l.label}
+              </a>
+            ))}
+          </div>
+
+          {/* Contacto */}
+          <div>
+            <h4 className="font-mono text-[10px] tracking-[2px] uppercase mb-4" style={{ color: 'rgba(255,255,255,0.3)' }}>
+              Contacto
+            </h4>
+            {NAV_CONTACT.map(l => (
+              <a key={l.label} href={l.href} className="block mb-2.5 transition-colors hover:text-white" style={{ fontSize: 13, color: '#7A8494' }}>
+                {l.label}
+              </a>
+            ))}
           </div>
         </div>
 
-        <div className="mt-8 pt-8 border-t border-gray-800 flex justify-center">
-          <p className="text-xs text-gray-600 uppercase tracking-widest">
-            SaaS Factory OS v3
+        {/* Bottom bar */}
+        <div
+          className="flex flex-wrap justify-between items-center gap-3 pt-6"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
+        >
+          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>
+            © {year} ToneBox. Todos los derechos reservados.{' '}
+            <Link href="https://aztecstudio.net" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
+              Aztec Studio.Net
+            </Link>
           </p>
+          <div className="flex gap-2 flex-wrap">
+            {TECH_TAGS.map(t => (
+              <span
+                key={t}
+                className="font-mono text-[9px] tracking-[1px] uppercase px-2 py-1 rounded"
+                style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.25)' }}
+              >
+                {t}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </footer>

@@ -1,26 +1,42 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Syne, DM_Sans, Space_Mono } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 
-const inter = Inter({
+const syne = Syne({
   subsets: ['latin'],
-  variable: '--font-inter',
+  weight: ['400', '600', '700', '800'],
+  variable: '--font-syne',
+  display: 'swap',
+});
+
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  weight: ['300', '400', '500'],
+  variable: '--font-dm-sans',
+  display: 'swap',
+});
+
+const spaceMono = Space_Mono({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  variable: '--font-space-mono',
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
-  title: 'ToneBOX - Consumibles de Impresión',
-  description: 'E-commerce B2B/B2C de consumibles de impresión en México - Powered by SaaS Factory',
+  title: 'ToneBox — Tu oficina, siempre lista',
+  description:
+    'Consumibles e impresoras para PYMES. Ahorra hasta 60% con entrega en +44 ciudades de México. Toners, tintas y combos para tu oficina.',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.variable}>
-      <body className="min-h-screen bg-gray-50 font-sans antialiased">
+    <html
+      lang="es"
+      className={`${syne.variable} ${dmSans.variable} ${spaceMono.variable}`}
+    >
+      <body className="min-h-screen bg-[#0B0E14] text-white font-sans antialiased overflow-x-hidden">
         <Providers>{children}</Providers>
       </body>
     </html>
