@@ -57,8 +57,15 @@ router.get('/brands', async (req, res) => {
  */
 router.get('/bundles', async (req, res) => {
     try {
+        const maxPrice = req.query.maxPrice ? parseFloat(req.query.maxPrice) : null;
+
+        const where = { availabilityStatus: { not: 'OUT_OF_STOCK' } };
+        if (maxPrice != null && !isNaN(maxPrice)) {
+            where.price = { lte: maxPrice };
+        }
+
         const bundles = await prisma.productBundle.findMany({
-            where: { availabilityStatus: { not: 'OUT_OF_STOCK' } },
+            where,
             orderBy: { price: 'asc' },
         });
         res.json({ total: bundles.length, items: bundles });

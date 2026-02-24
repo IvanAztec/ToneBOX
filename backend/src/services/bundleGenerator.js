@@ -1,13 +1,15 @@
 /**
- * BUNDLE GENERATOR
- * Crea ProductBundles Tóner + Drum en dos estrategias:
+ * BUNDLE GENERATOR — Regla de Origen Único
  *
- * 1. generateOriginalBundles()   — CT original toners + CT drums (matching por printer models)
- * 2. generateCompatibleBundles() — CADTONER/BOP compatible toners + CT drums
- *    Cross-reference: compToner.compatibility[] contiene el sku del tonerOriginal,
- *    luego usa los printer models del original para encontrar drums.
+ * Cada Duo Pack (Tóner + Tambor) DEBE pertenecer al mismo proveedor/almacén.
+ * PROHIBIDO: mezclar proveedores en un mismo bundle (doble flete = pérdida de margen).
  *
- * Precio: (toner.priceMXN + drum.priceMXN) * 0.87  (ahorro 13%)
+ * Estrategia única: generateSameProviderBundles(providerCode)
+ *   - Fetches toners + drums del MISMO proveedor
+ *   - Empareja por valores compartidos en compatibility[]
+ *   - Precio: (toner.priceMXN + drum.priceMXN) * 0.87  (13% de ahorro)
+ *
+ * Proveedores válidos: CT (original), CADTONER (compatible, 30 drums), UNICOM (original), BOP (sin drums → skip)
  */
 
 import { PrismaClient } from '@prisma/client';
@@ -16,126 +18,108 @@ const prisma = new PrismaClient();
 
 const BUNDLE_DISCOUNT = 0.87;
 
-// ── Estrategia 1: Originales CT-CT ───────────────────────────────────────────
-async function generateOriginalBundles() {
+// Proveedores a procesar en orden de prioridad
+const ACTIVE_PROVIDERS = ['CT', 'CADTONER', 'UNICOM', 'BOP'];
+
+// ── Genera bundles para UN proveedor específico ────────────────────────────────
+
+async function generateSameProviderBundles(providerCode) {
     const products = await prisma.product.findMany({
         where: {
             availabilityStatus: 'IN_STOCK',
             category: { in: ['Toner', 'Drum'] },
-            productType: 'ORIGINAL',
+            provider: { code: providerCode },
         },
-        select: { id: true, sku: true, name: true, brand: true, category: true, compatibility: true, priceMXN: true },
+        include: { provider: { select: { code: true } } },
     });
 
-    const toners = products.filter(p => p.category === 'Toner');
-    const drums  = products.filter(p => p.category === 'Drum');
-    const bundles = [];
+    const toners = products.filter(p => p.category === 'Toner' && p.priceMXN);
+    const drums  = products.filter(p => p.category === 'Drum'  && p.priceMXN);
+
+    if (toners.length === 0 || drums.length === 0) {
+        console.log(`[BundleGen] ${providerCode}: sin toners (${toners.length}) o drums (${drums.length}) — skip`);
+        return [];
+    }
+
+    console.log(`[BundleGen] ${providerCode}: ${toners.length} toners · ${drums.length} drums`);
+
+    const typeLabel = toners[0]?.productType === 'COMPATIBLE' ? 'Compatible ' : '';
+    const bundles   = [];
 
     for (const toner of toners) {
         if (!toner.compatibility?.length) continue;
 
-        const compatibleDrums = drums.filter(drum =>
-            drum.compatibility?.some(model => toner.compatibility.includes(model))
+        const matchingDrums = drums.filter(drum =>
+            drum.compatibility?.some(m => toner.compatibility.includes(m))
         );
 
-        for (const drum of compatibleDrums) {
+        for (const drum of matchingDrums) {
             const existing = await prisma.productBundle.findFirst({
                 where: { tonerId: toner.id, drumId: drum.id },
             });
             if (existing) continue;
 
             const sharedModels = toner.compatibility.filter(m => drum.compatibility.includes(m));
-            const printerModel = sharedModels[0] || 'Compatible';
-            const rawPrice = (toner.priceMXN || 0) + (drum.priceMXN || 0);
+            const printerModel = sharedModels[0] ?? 'Kit';
+            const rawPrice     = toner.priceMXN + drum.priceMXN;
 
             bundles.push({
-                name:               `Duo Pack ${toner.brand} ${printerModel}`,
+                name:               `Duo Pack ${typeLabel}${toner.brand ?? ''} ${printerModel}`.trim(),
                 description:        `${toner.name} + ${drum.name}`,
                 tonerId:            toner.id,
-                drumId:             drum.id,
-                price:              rawPrice > 0 ? parseFloat((rawPrice * BUNDLE_DISCOUNT).toFixed(2)) : null,
-                availabilityStatus: 'IN_STOCK',
-            });
-        }
-    }
-    return bundles;
-}
-
-// ── Estrategia 2: Compatible Toner + Original Drum ────────────────────────────
-// Cross-ref: compToner.compatibility contiene el OEM sku del toner original.
-// Usamos ese original para encontrar drums con printer models compatibles.
-async function generateCompatibleBundles() {
-    const origToners = await prisma.product.findMany({
-        where: { availabilityStatus: 'IN_STOCK', category: 'Toner', productType: 'ORIGINAL' },
-        select: { id: true, sku: true, providerSku: true, name: true, brand: true, compatibility: true, priceMXN: true },
-    });
-
-    const compToners = await prisma.product.findMany({
-        where: { availabilityStatus: 'IN_STOCK', category: 'Toner', productType: 'COMPATIBLE' },
-        select: { id: true, sku: true, name: true, brand: true, compatibility: true, priceMXN: true },
-    });
-
-    const drums = await prisma.product.findMany({
-        where: { availabilityStatus: 'IN_STOCK', category: 'Drum' },
-        select: { id: true, sku: true, name: true, brand: true, compatibility: true, priceMXN: true },
-    });
-
-    // Índice: origToner.sku → origToner
-    const origByOEM = new Map(origToners.map(t => [t.sku, t]));
-
-    const bundles = [];
-
-    for (const compToner of compToners) {
-        if (!compToner.compatibility?.length || !compToner.priceMXN) continue;
-
-        // Buscar el toner original referenciado por este compatible
-        const origToner = compToner.compatibility
-            .map(oemRef => origByOEM.get(oemRef))
-            .find(Boolean);
-
-        if (!origToner || !origToner.compatibility?.length) continue;
-
-        // Buscar drums compatibles con los printer models del original
-        const compatibleDrums = drums.filter(drum =>
-            drum.compatibility?.some(model => origToner.compatibility.includes(model))
-        );
-
-        for (const drum of compatibleDrums) {
-            if (!drum.priceMXN) continue;
-
-            const existing = await prisma.productBundle.findFirst({
-                where: { tonerId: compToner.id, drumId: drum.id },
-            });
-            if (existing) continue;
-
-            const printerModel = origToner.compatibility[0] || 'Compatible';
-            const rawPrice = compToner.priceMXN + drum.priceMXN;
-
-            bundles.push({
-                name:               `Duo Pack Compatible ${compToner.brand} ${printerModel}`,
-                description:        `${compToner.name} + ${drum.name}`,
-                tonerId:            compToner.id,
                 drumId:             drum.id,
                 price:              parseFloat((rawPrice * BUNDLE_DISCOUNT).toFixed(2)),
                 availabilityStatus: 'IN_STOCK',
             });
         }
     }
+
+    console.log(`[BundleGen] ${providerCode}: ${bundles.length} nuevos pares encontrados`);
     return bundles;
 }
 
-// ── Entry point ───────────────────────────────────────────────────────────────
-export async function generateBundlesFromDB() {
-    const [origBundles, compBundles] = await Promise.all([
-        generateOriginalBundles(),
-        generateCompatibleBundles(),
-    ]);
+// ── Elimina bundles cross-provider existentes ─────────────────────────────────
 
-    const allBundles = [...origBundles, ...compBundles];
+async function cleanCrossProviderBundles() {
+    const all = await prisma.productBundle.findMany({
+        include: {
+            toner: { include: { provider: { select: { code: true } } } },
+            drum:  { include: { provider: { select: { code: true } } } },
+        },
+    });
+
+    const invalid = all.filter(b => {
+        const tonerCode = b.toner?.provider?.code;
+        const drumCode  = b.drum?.provider?.code;
+        return tonerCode && drumCode && tonerCode !== drumCode;
+    });
+
+    if (invalid.length === 0) return 0;
+
+    await prisma.productBundle.deleteMany({
+        where: { id: { in: invalid.map(b => b.id) } },
+    });
+
+    console.log(`[BundleGen] 🧹 ${invalid.length} bundles cross-provider eliminados`);
+    return invalid.length;
+}
+
+// ── Entry point ───────────────────────────────────────────────────────────────
+
+export async function generateBundlesFromDB() {
+    // 1. Limpiar bundles inválidos previos
+    const cleaned = await cleanCrossProviderBundles();
+
+    // 2. Generar bundles por proveedor (mismo origen)
+    const results = await Promise.all(
+        ACTIVE_PROVIDERS.map(code => generateSameProviderBundles(code))
+    );
+
+    const allBundles = results.flat();
 
     if (allBundles.length === 0) {
         console.log('[BundleGen] No se encontraron nuevos pares compatibles.');
-        return 0;
+        return { created: 0, cleaned };
     }
 
     await prisma.productBundle.createMany({
@@ -143,6 +127,8 @@ export async function generateBundlesFromDB() {
         skipDuplicates: true,
     });
 
-    console.log(`[BundleGen] ✅ ${origBundles.length} bundles originales + ${compBundles.length} bundles compatibles generados.`);
-    return allBundles.length;
+    const byProvider = ACTIVE_PROVIDERS.map((code, i) => `${code}:${results[i].length}`).join(' · ');
+    console.log(`[BundleGen] ✅ ${allBundles.length} bundles creados (${byProvider}) · ${cleaned} inválidos eliminados`);
+
+    return { created: allBundles.length, cleaned };
 }

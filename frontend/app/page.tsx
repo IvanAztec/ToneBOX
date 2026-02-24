@@ -19,6 +19,31 @@ interface Bundle {
   availabilityStatus: string;
 }
 
+// Modelos de alto volumen (home/office laser) — priorizados sobre industriales/plotters
+const PRIORITY_SKUS = [
+  '85A','78A','05A','80A','55A','64A','12A','35A','36A','51A','53A','26A','30A','58A','87A',
+  'TN-660','TN-630','TN-760','TN-227','TN-433','TN-436','TN-850','TN-880',
+  'TK-1175','TK-3182','TK-5242','TK-1162','TK-5292',
+  'DR-630','DR-760','DR-820','DR-3300',
+  'CRG-128','CRG-137','CRG-045',
+];
+
+function scorePriority(b: Bundle): number {
+  const text = `${b.name} ${b.description ?? ''}`.toUpperCase();
+  return PRIORITY_SKUS.some(k => text.includes(k.toUpperCase())) ? 1 : 0;
+}
+
+function sortBundles(items: Bundle[]): Bundle[] {
+  return [...items].sort((a, b) => {
+    const scoreDiff = scorePriority(b) - scorePriority(a);
+    if (scoreDiff !== 0) return scoreDiff;
+    return (a.price ?? 0) - (b.price ?? 0);
+  });
+}
+
+const BUNDLE_LANDING_LIMIT  = 12;
+const BUNDLE_MAX_PRICE_MXN  = 4500;
+
 interface CatalogAlert {
   id: string;
   query: string;
@@ -46,6 +71,7 @@ export default function HomePage() {
 
   const [bundles, setBundles]               = useState<Bundle[]>([]);
   const [bundlesLoading, setBundlesLoading] = useState(true);
+  const [showAllBundles, setShowAllBundles] = useState(false);
   const [alerts, setAlerts]                 = useState<CatalogAlert[]>([]);
   const [alertsLoading, setAlertsLoading]   = useState(true);
 
@@ -57,9 +83,9 @@ export default function HomePage() {
   const checkoutRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch('/api/products/bundles')
+    fetch(`/api/products/bundles?maxPrice=${BUNDLE_MAX_PRICE_MXN}`)
       .then(r => r.json())
-      .then(data => setBundles(data.items ?? []))
+      .then(data => setBundles(sortBundles(data.items ?? [])))
       .catch(() => setBundles([]))
       .finally(() => setBundlesLoading(false));
   }, []);
@@ -203,41 +229,57 @@ export default function HomePage() {
                     Los Duo Packs aparecerán cuando se sincronice el catálogo CT.
                   </p>
                 </div>
-              ) : (
-                bundles.map(b => {
-                  const isSelected = selectedBundleId === b.id;
-                  return (
-                    <button
-                      key={b.id}
-                      onClick={() => handleBundleSelect(b)}
-                      className={`w-full p-4 rounded-2xl border-2 text-left transition-all ${
-                        isSelected
-                          ? 'border-green-500 bg-green-50/50 shadow-sm shadow-green-100'
-                          : 'border-gray-100 bg-gray-50/80 hover:border-blue-200 hover:shadow-sm'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <p className="font-black text-sm text-gray-900 leading-snug flex-1">{b.name}</p>
-                        {isSelected ? (
-                          <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
-                        ) : (
-                          <span className="text-[10px] font-black bg-green-100 text-green-700 px-1.5 py-0.5 rounded shrink-0">
-                            Ahorro 13%
-                          </span>
-                        )}
-                      </div>
-                      {b.price != null && (
-                        <p className="text-xs font-black text-blue-600 mt-1.5">
-                          ${b.price.toFixed(0)} MXN
-                        </p>
-                      )}
-                      {b.description && (
-                        <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">{b.description}</p>
-                      )}
-                    </button>
-                  );
-                })
-              )}
+              ) : (() => {
+                const visibleBundles = showAllBundles ? bundles : bundles.slice(0, BUNDLE_LANDING_LIMIT);
+                const hasMore = bundles.length > BUNDLE_LANDING_LIMIT;
+                return (
+                  <>
+                    {visibleBundles.map(b => {
+                      const isSelected = selectedBundleId === b.id;
+                      return (
+                        <button
+                          key={b.id}
+                          onClick={() => handleBundleSelect(b)}
+                          className={`w-full p-4 rounded-2xl border-2 text-left transition-all ${
+                            isSelected
+                              ? 'border-green-500 bg-green-50/50 shadow-sm shadow-green-100'
+                              : 'border-gray-100 bg-gray-50/80 hover:border-blue-200 hover:shadow-sm'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <p className="font-black text-sm text-gray-900 leading-snug flex-1">{b.name}</p>
+                            {isSelected ? (
+                              <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
+                            ) : (
+                              <span className="text-[10px] font-black bg-green-100 text-green-700 px-1.5 py-0.5 rounded shrink-0">
+                                Ahorro 13%
+                              </span>
+                            )}
+                          </div>
+                          {b.price != null && (
+                            <p className="text-xs font-black text-blue-600 mt-1.5">
+                              ${b.price.toFixed(0)} MXN
+                            </p>
+                          )}
+                          {b.description && (
+                            <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">{b.description}</p>
+                          )}
+                        </button>
+                      );
+                    })}
+                    {hasMore && (
+                      <button
+                        onClick={() => setShowAllBundles(p => !p)}
+                        className="w-full py-2.5 rounded-2xl border-2 border-dashed border-gray-200 text-xs font-bold text-gray-400 hover:border-blue-300 hover:text-blue-500 transition-all"
+                      >
+                        {showAllBundles
+                          ? `▲ Ver menos`
+                          : `Ver todos los Duo Packs (${bundles.length - BUNDLE_LANDING_LIMIT} más)`}
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
 
