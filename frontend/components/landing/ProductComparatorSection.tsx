@@ -59,11 +59,25 @@ const BRAND_ORDER = ['hp','brother','canon','epson','kyocera','samsung','xerox',
 
 const NOISE_CATEGORIES = new Set(['Ribbon','Label','Paper','Consumible','Ink']);
 
-const QUICK_ACCESS = [
-  { id: 'Toner',   emoji: '🖨️', label: 'Tóners'   },
-  { id: 'Drum',    emoji: '🥁', label: 'Tambores'  },
-  { id: 'bundles', emoji: '💎', label: 'Duo Packs' },
-  { id: 'search',  emoji: '🔍', label: 'Buscador'  },
+// Icono SVG de tambor/drum de impresora (cilindro OPC)
+function OPCDrumIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-6 h-6 sm:w-7 sm:h-7" fill="none"
+      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <ellipse cx="12" cy="6"  rx="8" ry="3" />
+      <ellipse cx="12" cy="18" rx="8" ry="3" />
+      <line x1="4"  y1="6" x2="4"  y2="18" />
+      <line x1="20" y1="6" x2="20" y2="18" />
+      <line x1="12" y1="3" x2="12" y2="6"  strokeWidth="1.2" />
+    </svg>
+  );
+}
+
+const QUICK_ACCESS: { id: string; icon: React.ReactNode; label: string }[] = [
+  { id: 'Toner',   icon: '🖨️',          label: 'Tóners'   },
+  { id: 'Drum',    icon: <OPCDrumIcon />, label: 'Tambores'  },
+  { id: 'bundles', icon: '💎',            label: 'Duo Packs' },
+  { id: 'search',  icon: '🔍',            label: 'Buscador'  },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -344,7 +358,7 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
                     : 'border-gray-200 bg-white hover:border-green-300 hover:bg-green-50/50'
                 }`}
               >
-                <span className="text-xl sm:text-2xl leading-none">{qa.emoji}</span>
+                <span className="text-xl sm:text-2xl leading-none flex items-center justify-center">{qa.icon}</span>
                 <span className="text-[10px] sm:text-[11px] font-black text-gray-700 text-center leading-tight">{qa.label}</span>
               </button>
             );
