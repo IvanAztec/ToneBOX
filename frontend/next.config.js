@@ -7,6 +7,9 @@ const nextConfig = {
       'avatars.githubusercontent.com',
       'tonebox.mx',
       'www.tonebox.mx',
+      'ctonline.mx',
+      'connect.ctonline.mx',
+      'images.ctonline.mx',
     ],
   },
   async rewrites() {

@@ -6,6 +6,42 @@ import { evaluateDemandThreshold } from '../services/catalogIntelligence.js';
 const router = express.Router();
 const prisma = new PrismaClient();
 
+// ── Fuzzy intent parser ───────────────────────────────────────────────────────
+// Permite queries como "toner para hp laserjet" o "tambores brother"
+
+const STOP_WORDS = new Set([
+    'para','de','el','la','los','las','con','en','un','una','mi','su',
+    'y','o','a','al','del','que','impresora','por','mis','sus','marca',
+]);
+
+const INTENT_BRANDS = {
+    hp:'hp', hewlett:'hp', 'hewlett-packard':'hp',
+    brother:'brother', canon:'canon', epson:'epson',
+    kyocera:'kyocera', samsung:'samsung', xerox:'xerox',
+    ricoh:'ricoh', lexmark:'lexmark',
+};
+
+const INTENT_CATEGORIES = {
+    toner:'Toner', tóner:'Toner', toners:'Toner', tóners:'Toner',
+    drum:'Drum', tambor:'Drum', tambores:'Drum', drums:'Drum',
+    cartucho:'Cartucho', cartuchos:'Cartucho', tinta:'Cartucho', tintas:'Cartucho',
+};
+
+const NOISE_CATEGORIES = ['Ribbon','Label','Paper','Consumible'];
+
+function parseIntent(rawQ) {
+    const tokens = rawQ.toLowerCase().split(/[\s,;/]+/).filter(t => t.length > 1);
+    let brand = null, category = null;
+    const model = [];
+    for (const t of tokens) {
+        if (STOP_WORDS.has(t))     continue;
+        if (INTENT_BRANDS[t])     { brand    = brand    || INTENT_BRANDS[t];    continue; }
+        if (INTENT_CATEGORIES[t]) { category = category || INTENT_CATEGORIES[t]; continue; }
+        model.push(t);
+    }
+    return { brand, category, model };
+}
+
 /**
  * @route GET /api/products
  * @desc List all available products (not OUT_OF_STOCK)
@@ -84,27 +120,44 @@ router.get('/search', async (req, res) => {
     try {
         const { q, brand, category } = req.query;
 
-        if (!q && !brand) {
-            return res.status(400).json({ error: 'Se requiere q (búsqueda) o brand (marca)' });
+        if (!q && !brand && !category) {
+            return res.status(400).json({ error: 'Se requiere q, brand o category' });
         }
 
-        const where = {};
+        // ── Fuzzy intent: parsea lenguaje natural ─────────────────────────────
+        const intent      = q ? parseIntent(q) : { brand: null, category: null, model: [] };
+        const effBrand    = brand    || intent.brand;
+        const effCategory = category || intent.category;
+        const conditions  = [];
 
-        if (q) {
-            where.OR = [
-                { name:          { contains: q, mode: 'insensitive' } },
-                { sku:           { contains: q, mode: 'insensitive' } },
-                { compatibility: { hasSome: [q.toUpperCase()] } },
-            ];
+        // Texto: cada token del modelo DEBE aparecer en name/sku/compatibility (AND)
+        if (intent.model.length > 0) {
+            for (const t of intent.model) {
+                conditions.push({
+                    OR: [
+                        { name:          { contains: t, mode: 'insensitive' } },
+                        { sku:           { contains: t, mode: 'insensitive' } },
+                        { compatibility: { hasSome:  [t.toUpperCase()] } },
+                    ],
+                });
+            }
+        } else if (q && !intent.brand && !intent.category) {
+            // Sin intención detectada → búsqueda de cadena completa como fallback
+            conditions.push({
+                OR: [
+                    { name:          { contains: q, mode: 'insensitive' } },
+                    { sku:           { contains: q, mode: 'insensitive' } },
+                    { compatibility: { hasSome:  [q.toUpperCase()] } },
+                ],
+            });
         }
 
-        if (brand) {
-            where.brand = { contains: brand, mode: 'insensitive' };
-        }
+        // Filtros de marca y categoría
+        if (effBrand)    conditions.push({ brand:    { contains: effBrand,    mode: 'insensitive' } });
+        if (effCategory) conditions.push({ category: { contains: effCategory, mode: 'insensitive' } });
+        else             conditions.push({ category: { notIn: NOISE_CATEGORIES } });
 
-        if (category) {
-            where.category = { contains: category, mode: 'insensitive' };
-        }
+        const where = conditions.length > 0 ? { AND: conditions } : {};
 
         // Execute search — include provider for tier classification
         const rawProducts = await prisma.product.findMany({

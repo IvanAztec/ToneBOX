@@ -4,8 +4,12 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight, ArrowLeft, Shield, BarChart3, Zap,
-  AlertTriangle, RefreshCw, CheckCircle2, Package2,
+  AlertTriangle, RefreshCw, CheckCircle2, Package2, MessageCircle,
 } from 'lucide-react';
+
+// ⚠️ Configura tu número de WhatsApp de ventas ToneBOX
+const WA_FLOAT_NUMBER = '5215500000000';
+const WA_FLOAT_MSG    = encodeURIComponent('Hola, tengo una duda sobre ToneBOX. ¿Me pueden ayudar?');
 import Footer from '@/components/shared/Footer';
 import PaymentGateway from '@/components/checkout/PaymentGateway';
 import ProductComparatorSection from '@/components/landing/ProductComparatorSection';
@@ -205,7 +209,7 @@ export default function HomePage() {
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
 
           {/* ── Bundles Widget ── */}
-          <div className="bg-white p-7 rounded-[2rem] shadow-2xl shadow-gray-200/60 border border-gray-100 flex flex-col">
+          <div id="bundles-widget" className="bg-white p-7 rounded-[2rem] shadow-2xl shadow-gray-200/60 border border-gray-100 flex flex-col">
             <div className="flex justify-between items-start mb-6">
               <div className="w-11 h-11 rounded-2xl bg-blue-50 flex items-center justify-center">
                 <Package2 className="w-5 h-5 text-blue-600" />
@@ -396,6 +400,18 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ── Botón flotante WhatsApp ── */}
+      <a
+        href={`https://wa.me/${WA_FLOAT_NUMBER}?text=${WA_FLOAT_MSG}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 right-5 z-50 flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white text-sm font-bold px-4 py-3 rounded-full shadow-2xl shadow-green-500/40 transition-all hover:scale-105 active:scale-95"
+        aria-label="Chat por WhatsApp"
+      >
+        <MessageCircle className="w-5 h-5" />
+        <span className="hidden sm:inline">¿Dudas?</span>
+      </a>
 
       <Footer />
     </div>
