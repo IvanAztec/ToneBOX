@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, CreditCard, Users, Building2, Settings,
-  LogOut, Menu, X, Bell, Search, ChevronDown, Package, Zap,
+  LogOut, Menu, X, Bell, Search, ChevronDown, Package, Zap, Truck,
 } from 'lucide-react';
 import { useAuth } from '@/app/providers';
 
@@ -18,7 +18,8 @@ interface NavItem {
 
 const navigation: NavItem[] = [
   { name: 'Panel Principal',    href: '/dashboard',             icon: LayoutDashboard },
-  { name: 'Inventario CT',      href: '/admin/inventory',       icon: Package, adminOnly: true },
+  { name: 'Inventario CT',      href: '/admin/inventory',       icon: Package,  adminOnly: true },
+  { name: 'Importar Catálogos', href: '/admin/providers',       icon: Truck,    adminOnly: true },
   { name: 'Facturación',        href: '/dashboard/billing',     icon: CreditCard },
   { name: 'Equipo',             href: '/dashboard/teams',       icon: Users },
   { name: 'Espacios de Trabajo',href: '/dashboard/workspaces',  icon: Building2 },
