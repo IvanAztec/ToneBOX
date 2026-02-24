@@ -313,18 +313,21 @@ model Product {
   @@map("products")
 }
 
-// Product bundle model (Toner + Drum pairings, Duo Packs)
+// Product bundle model (Duo Pack, TriPack, Pack Business Start)
 model ProductBundle {
   id                 String   @id @default(cuid())
   name               String
   description        String?
+  comboType          String   @default("DUO_PACK") // DUO_PACK | TRIPACK | BUSINESS_START
   tonerId            String
   drumId             String
+  toner2Id           String?  // Segundo tóner (TriPack: 2 Toners + 1 Drum)
+  hardwareId         String?  // Hardware para Pack Business Start
   price              Float?   // Precio público del bundle (publicPrices * descuento)
   speiPrice          Float?   // Precio SPEI = price / 1.04
   freeShipping       Boolean  @default(false) // Envío gratis — combos 2+ consumibles
   availabilityStatus String   @default("IN_STOCK") // IN_STOCK | ON_DEMAND | OUT_OF_STOCK
-  
+
   // Timestamps
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt

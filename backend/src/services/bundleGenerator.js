@@ -1,22 +1,23 @@
 /**
- * BUNDLE GENERATOR — Regla de Origen Único
+ * BUNDLE GENERATOR — Duo Packs por proveedor
  *
- * Cada Duo Pack (Tóner + Tambor) DEBE pertenecer al mismo proveedor/almacén.
- * PROHIBIDO: mezclar proveedores en un mismo bundle (doble flete = pérdida de margen).
+ * Genera Duo Packs (Tóner + Tambor) emparejando productos del mismo proveedor
+ * para evitar doble flete. Los TriPacks y Pack Business Start se crean manualmente
+ * o via el panel admin.
  *
- * Estrategia única: generateSameProviderBundles(providerCode)
- *   - Fetches toners + drums del MISMO proveedor
+ * Estrategia: generateSameProviderBundles(providerCode)
+ *   - Fetches toners + drums del mismo proveedor
  *   - Empareja por valores compartidos en compatibility[]
- *   - Precio: (toner.publicPrice + drum.publicPrice) * 0.87  (13% de ahorro)
+ *   - Precio: (toner.publicPrice + drum.publicPrice) * 0.97  (3% descuento combo)
  *
- * Proveedores válidos: CT (original), CADTONER (compatible, 30 drums), UNICOM (original), BOP (sin drums → skip)
+ * Proveedores válidos: CT (original), CADTONER (compatible), UNICOM (original), BOP (sin drums → skip)
  */
 
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const BUNDLE_DISCOUNT = 0.87;
+const BUNDLE_DISCOUNT = 0.97; // 3% descuento por compra en combo
 
 // Proveedores a procesar en orden de prioridad
 const ACTIVE_PROVIDERS = ['CT', 'CADTONER', 'UNICOM', 'BOP'];
@@ -67,11 +68,12 @@ async function generateSameProviderBundles(providerCode) {
             bundles.push({
                 name:               `Duo Pack ${typeLabel}${toner.brand ?? ''} ${printerModel}`.trim(),
                 description:        `${toner.name} + ${drum.name}`,
+                comboType:          'DUO_PACK',
                 tonerId:            toner.id,
                 drumId:             drum.id,
                 price:              parseFloat((rawPublic * BUNDLE_DISCOUNT).toFixed(2)),
                 speiPrice:          parseFloat((rawSpei  * BUNDLE_DISCOUNT).toFixed(2)),
-                freeShipping:       true, // Combo tóner + tambor = envío gratis
+                freeShipping:       true,
                 availabilityStatus: 'IN_STOCK',
             });
         }
