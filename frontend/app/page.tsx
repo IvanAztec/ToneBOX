@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import Footer from '@/components/shared/Footer';
 import PaymentGateway from '@/components/checkout/PaymentGateway';
+import ProductComparatorSection from '@/components/landing/ProductComparatorSection';
 import { useAuth } from '@/app/providers';
 
 interface Bundle {
@@ -299,6 +300,17 @@ export default function HomePage() {
 
         </div>
       </section>
+
+      {/* ── Comparador de Productos por Marca ── */}
+      <ProductComparatorSection
+        onSelectProduct={(name, price) => {
+          setSelectedProductName(name);
+          setSelectedPrice(price);
+          setTimeout(() => {
+            checkoutRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }, 80);
+        }}
+      />
 
       {/* ── Features Section ── */}
       <section className="py-32">

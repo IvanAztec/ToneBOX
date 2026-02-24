@@ -27,6 +27,31 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * @route GET /api/products/brands
+ * @desc Distinct brands with product count (for brand filter UI)
+ */
+router.get('/brands', async (req, res) => {
+    try {
+        const result = await prisma.product.groupBy({
+            by: ['brand'],
+            where: {
+                brand: { not: null },
+                availabilityStatus: { not: 'OUT_OF_STOCK' },
+            },
+            _count: { brand: true },
+            orderBy: { _count: { brand: 'desc' } },
+        });
+        const brands = result
+            .filter(r => r.brand && r.brand !== 'Sin marca')
+            .map(r => ({ name: r.brand, count: r._count.brand }));
+        res.json({ brands });
+    } catch (error) {
+        if (error.code === 'P2021') return res.json({ brands: [] });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
  * @route GET /api/products/bundles
  * @desc List all active Duo Pack bundles
  */
@@ -34,7 +59,7 @@ router.get('/bundles', async (req, res) => {
     try {
         const bundles = await prisma.productBundle.findMany({
             where: { availabilityStatus: { not: 'OUT_OF_STOCK' } },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { price: 'asc' },
         });
         res.json({ total: bundles.length, items: bundles });
     } catch (error) {
@@ -46,45 +71,49 @@ router.get('/bundles', async (req, res) => {
 
 /**
  * @route GET /api/products/search
- * @desc Search products and log results with market intelligence validation
+ * @desc Search products with tier classification. Requires q or brand.
  */
 router.get('/search', async (req, res) => {
     try {
         const { q, brand, category } = req.query;
 
-        if (!q) {
-            return res.status(400).json({ error: 'Search query is required' });
+        if (!q && !brand) {
+            return res.status(400).json({ error: 'Se requiere q (búsqueda) o brand (marca)' });
         }
 
-        // Prepare search filters
-        const where = {
-            OR: [
-                { name: { contains: q, mode: 'insensitive' } },
-                { sku: { contains: q, mode: 'insensitive' } },
-                { compatibility: { hasSome: [q] } },
-            ],
-        };
+        const where = {};
 
-        if (brand) where.brand = brand;
-        if (category) where.category = category;
+        if (q) {
+            where.OR = [
+                { name:          { contains: q, mode: 'insensitive' } },
+                { sku:           { contains: q, mode: 'insensitive' } },
+                { compatibility: { hasSome: [q.toUpperCase()] } },
+            ];
+        }
+
+        if (brand) {
+            where.brand = { contains: brand, mode: 'insensitive' };
+        }
+
+        if (category) {
+            where.category = { contains: category, mode: 'insensitive' };
+        }
 
         // Execute search — include provider for tier classification
         const rawProducts = await prisma.product.findMany({
             where,
             include: { provider: { select: { name: true, code: true } } },
-            take: 20,
+            take: 60,
+            orderBy: { priceMXN: 'asc' },
         });
 
         // ── Tier classification ───────────────────────────────────────────────
-        // AHORRO_VIP: BOP / CADTONER (Compatibles estratégicos)
-        // PREMIUM:    CT / UNICOM (Originales + HP exclusivo)
         const AHORRO_PROVIDERS = new Set(['BOP', 'BOP-MX', 'CADTONER']);
         const products = rawProducts
             .map(p => ({
                 ...p,
                 tier: AHORRO_PROVIDERS.has(p.provider?.code) ? 'AHORRO_VIP' : 'PREMIUM',
             }))
-            // Sort: COMPATIBLE (AHORRO_VIP) first, then ORIGINAL (PREMIUM)
             .sort((a, b) => {
                 if (a.tier === 'AHORRO_VIP' && b.tier !== 'AHORRO_VIP') return -1;
                 if (a.tier !== 'AHORRO_VIP' && b.tier === 'AHORRO_VIP') return 1;
@@ -93,36 +122,39 @@ router.get('/search', async (req, res) => {
 
         const count = products.length;
 
-        // VALIDATION LOGIC: If no results found, check if it "exists in reality" (heuristic)
+        // VALIDATION LOGIC: If no results found, check if it "exists in reality"
         let validation = { isPotential: false };
-        if (count === 0) {
+        if (count === 0 && q) {
             validation = validatePotentialProduct(q);
         }
 
-        // LOGGING REQUIREMENT: Track missed opportunities vs typos
-        await prisma.searchLog.create({
-            data: {
-                query: q,
-                resultsCount: count,
-                isPotentialProduct: validation.isPotential,
-                metadata: count === 0 ? validation : {},
-                userId: req.user?.id || null,
-                ipAddress: req.ip,
-            },
-        });
+        // LOGGING REQUIREMENT: Track missed opportunities
+        if (q) {
+            await prisma.searchLog.create({
+                data: {
+                    query:              q,
+                    resultsCount:       count,
+                    isPotentialProduct: validation.isPotential,
+                    metadata:           count === 0 ? validation : {},
+                    userId:             req.user?.id || null,
+                    ipAddress:          req.ip,
+                },
+            });
+        }
 
-        // AUTO-BLINDAJE: Si no hay resultados, evaluar si debemos crear una alerta
+        // AUTO-BLINDAJE: Si no hay resultados, evaluar alerta
         let catalogAlert = null;
-        if (count === 0 && validation.isPotential) {
+        if (count === 0 && validation.isPotential && q) {
             catalogAlert = await evaluateDemandThreshold(q, validation);
         }
 
         res.json({
-            query: q,
-            total: count,
+            query:   q || null,
+            brand:   brand || null,
+            total:   count,
             isPotentialValidProduct: validation.isPotential,
             ...(catalogAlert && { demandAlert: { priority: catalogAlert.priority, hitCount: catalogAlert.hitCount } }),
-            products
+            products,
         });
     } catch (error) {
         console.error('Search error:', error);
@@ -138,15 +170,10 @@ router.get('/search', async (req, res) => {
 router.get('/search-logs', async (req, res) => {
     try {
         const logs = await prisma.searchLog.findMany({
-            where: {
-                resultsCount: 0,
-            },
-            orderBy: {
-                createdAt: 'desc',
-            },
+            where: { resultsCount: 0 },
+            orderBy: { createdAt: 'desc' },
             take: 100,
         });
-
         res.json(logs);
     } catch (error) {
         console.error('Logs fetch error:', error);
@@ -161,16 +188,10 @@ router.get('/search-logs', async (req, res) => {
 router.get('/lost-opportunities', async (req, res) => {
     try {
         const opportunities = await prisma.searchLog.findMany({
-            where: {
-                resultsCount: 0,
-                isPotentialProduct: true,
-            },
-            orderBy: {
-                createdAt: 'desc',
-            },
+            where: { resultsCount: 0, isPotentialProduct: true },
+            orderBy: { createdAt: 'desc' },
             take: 10,
         });
-
         res.json(opportunities);
     } catch (error) {
         console.error('Opportunities fetch error:', error);
