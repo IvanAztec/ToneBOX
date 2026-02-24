@@ -29,6 +29,24 @@ const INTENT_CATEGORIES = {
 
 const NOISE_CATEGORIES = ['Ribbon','Label','Paper','Consumible'];
 
+/**
+ * Generate SKU variants with and without dashes so that 'tn660' matches 'TN-660' and vice-versa.
+ * e.g. 'tn660' → ['tn660', 'tn-660']
+ *      'tn-660' → ['tn-660', 'tn660']
+ */
+function skuVariants(t) {
+    const variants = [t];
+    const stripped = t.replace(/-/g, '');
+    if (stripped !== t) {
+        variants.push(stripped);
+    } else {
+        // Try inserting a dash at the letter-to-number boundary
+        const m = t.match(/^([a-z]+)(\d[\w]*)$/);
+        if (m) variants.push(`${m[1]}-${m[2]}`);
+    }
+    return [...new Set(variants)];
+}
+
 function parseIntent(rawQ) {
     const tokens = rawQ.toLowerCase().split(/[\s,;/]+/).filter(t => t.length > 1);
     let brand = null, category = null;
@@ -137,24 +155,29 @@ router.get('/search', async (req, res) => {
         const conditions  = [];
 
         // Texto: cada token del modelo DEBE aparecer en name/sku/compatibility (AND)
+        // skuVariants normalizes dashes so 'tn660' matches 'TN-660' and vice-versa
         if (intent.model.length > 0) {
             for (const t of intent.model) {
+                const variants = skuVariants(t);
                 conditions.push({
-                    OR: [
-                        { name:          { contains: t, mode: 'insensitive' } },
-                        { sku:           { contains: t, mode: 'insensitive' } },
-                        { compatibility: { hasSome:  [t.toUpperCase()] } },
-                    ],
+                    OR: variants.flatMap(v => [
+                        { name:          { contains: v, mode: 'insensitive' } },
+                        { sku:           { contains: v, mode: 'insensitive' } },
+                        { providerSku:   { contains: v, mode: 'insensitive' } },
+                        { compatibility: { hasSome:  [v.toUpperCase()] } },
+                    ]),
                 });
             }
         } else if (q && !intent.brand && !intent.category) {
             // Sin intención detectada → búsqueda de cadena completa como fallback
+            const variants = skuVariants(q.toLowerCase().trim());
             conditions.push({
-                OR: [
-                    { name:          { contains: q, mode: 'insensitive' } },
-                    { sku:           { contains: q, mode: 'insensitive' } },
-                    { compatibility: { hasSome:  [q.toUpperCase()] } },
-                ],
+                OR: variants.flatMap(v => [
+                    { name:          { contains: v, mode: 'insensitive' } },
+                    { sku:           { contains: v, mode: 'insensitive' } },
+                    { providerSku:   { contains: v, mode: 'insensitive' } },
+                    { compatibility: { hasSome:  [v.toUpperCase()] } },
+                ]),
             });
         }
 

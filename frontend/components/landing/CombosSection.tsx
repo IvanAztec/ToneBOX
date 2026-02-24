@@ -35,7 +35,7 @@ const COMBO_TYPE_CONFIG: Record<string, {
       style: { background: 'rgba(26,107,255,0.15)', color: '#1A6BFF', border: '1px solid rgba(26,107,255,0.3)' },
     },
     icon: '🖥️',
-    features: ['1x Impresora Multifuncional', '2x Tóners Alta Capacidad', '1x Unidad de Imagen (Drum)', 'Envío Gratis'],
+    features: ['Incluye 2 Tóners Extra + 1 Drum adicional', '1x Impresora Multifuncional', 'Envío Gratis'],
   },
   DUO_PACK: {
     badge: {
@@ -43,7 +43,15 @@ const COMBO_TYPE_CONFIG: Record<string, {
       style: { background: 'rgba(255,92,40,0.15)', color: '#FF5C28', border: '1px solid rgba(255,92,40,0.3)' },
     },
     icon: '💚',
-    features: ['1x Tóner Alta Capacidad', '1x Unidad de Imagen (Drum)', 'Ahorro garantizado', 'Factura CFDI incluida'],
+    features: ['Tóner + Drum Premium ToneBOX', '1x Tóner Alta Capacidad', '1x Unidad de Imagen (Drum)', 'Ahorro garantizado', 'Factura CFDI incluida'],
+  },
+  ULTRAPACK: {
+    badge: {
+      label: '🏆 Ultra',
+      style: { background: 'rgba(255,200,0,0.15)', color: '#FFC800', border: '1px solid rgba(255,200,0,0.3)' },
+    },
+    icon: '⚡',
+    features: ['3x Tóners Alta Capacidad', '1x Unidad de Imagen (Drum)', 'Alto Volumen 8,100 pgs', 'Envío Gratis Nacional'],
   },
 };
 
@@ -58,6 +66,7 @@ const STATIC_COMBOS = [
     comboType: 'TRIPACK',
     freeShipping: true,
     featured: true,
+    retailSaved: 860,
   },
   {
     name: 'TriPack Ahorro Total',
@@ -66,6 +75,16 @@ const STATIC_COMBOS = [
     comboType: 'TRIPACK',
     freeShipping: true,
     featured: false,
+    retailSaved: 910,
+  },
+  {
+    name: 'TriPack Ultra Brother — Serie L5000',
+    desc: '3× TN850 Alta Cap. + 1× DR820 Drum — Alto Volumen',
+    price: 3990,
+    comboType: 'ULTRAPACK',
+    freeShipping: true,
+    featured: false,
+    retailSaved: 1210,
   },
   {
     name: 'Pack Business Start',
@@ -74,6 +93,7 @@ const STATIC_COMBOS = [
     comboType: 'BUSINESS_START',
     freeShipping: true,
     featured: false,
+    retailSaved: 1710,
   },
 ];
 
@@ -81,7 +101,7 @@ export default function CombosSection({ bundles, onSelect }: Props) {
   const apiShown = bundles.slice(0, 6);
   const useStatic = apiShown.length === 0;
   const colsClass = useStatic
-    ? 'lg:grid-cols-3'
+    ? 'lg:grid-cols-4'
     : apiShown.length <= 3
       ? 'lg:grid-cols-3'
       : 'lg:grid-cols-4';
@@ -115,7 +135,7 @@ export default function CombosSection({ bundles, onSelect }: Props) {
                   price={c.price}
                   speiPrice={parseFloat((c.price / 1.04).toFixed(0))}
                   freeShipping={c.freeShipping}
-                  wasSaved={Math.round(c.price / 0.97 - c.price)}
+                  wasSaved={c.retailSaved}
                   onSelect={() => onSelect({ id: `static-${i}`, name: c.name, description: c.desc, price: c.price, comboType: c.comboType })}
                 />
               ))
@@ -208,7 +228,7 @@ function ComboCard({ isFeatured, comboType, name, desc, price, speiPrice, freeSh
           )}
           {wasSaved > 0 && (
             <div style={{ fontSize: 12, color: '#7A8494', marginTop: 2 }}>
-              Ahorras ${wasSaved.toLocaleString('es-MX')} MXN comprando en combo
+              Ahorras ${wasSaved.toLocaleString('es-MX')} MXN vs tienda
             </div>
           )}
         </div>

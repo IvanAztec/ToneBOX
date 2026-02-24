@@ -321,7 +321,11 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
   }, []);
 
   const doSearch = useCallback(async (brand: string | null, q: string, cat: string | null) => {
-    if (!brand && !q.trim() && !cat) return;
+    if (!brand && !q.trim() && !cat) {
+      setProducts([]);
+      setSearched(false);
+      return;
+    }
     setLoading(true);
     setSearched(true);
     setShowAll(false);
@@ -417,8 +421,9 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
                 className="flex flex-col items-center gap-1.5 py-3 sm:py-4 px-1 rounded-2xl transition-all active:scale-95"
                 style={{
                   border:     isActive ? '2px solid #00C896' : '2px solid rgba(255,255,255,0.1)',
-                  background: isActive ? 'rgba(0,200,150,0.1)' : 'rgba(255,255,255,0.04)',
+                  background: isActive ? 'rgba(0,200,150,0.12)' : 'rgba(255,255,255,0.04)',
                   color:      isActive ? '#00C896' : 'rgba(255,255,255,0.6)',
+                  boxShadow:  isActive ? '0 0 12px rgba(0,200,150,0.3)' : undefined,
                 }}
               >
                 <span className="text-xl sm:text-2xl leading-none flex items-center justify-center">
@@ -446,8 +451,9 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
                 style={{
                   background: isActive ? cfg.bg : 'rgba(255,255,255,0.06)',
                   color:      isActive ? 'white' : 'rgba(255,255,255,0.5)',
-                  border:     isActive ? `1px solid ${cfg.bg}` : '1px solid rgba(255,255,255,0.1)',
+                  border:     isActive ? `2px solid ${cfg.bg}` : '1px solid rgba(255,255,255,0.1)',
                   transform:  isActive ? 'scale(1.05)' : undefined,
+                  boxShadow:  isActive ? `0 0 14px ${cfg.bg}55` : undefined,
                 }}
               >
                 {cfg.label}
@@ -506,9 +512,19 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
           <div className="text-center py-16">
             <Search className="w-12 h-12 mx-auto mb-4" style={{ color: 'rgba(255,255,255,0.1)' }} />
             <p className="font-semibold" style={{ color: '#7A8494' }}>Sin resultados para esa búsqueda</p>
-            <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.2)' }}>
-              Intenta con el número de parte o el modelo de impresora.
+            <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.25)' }}>
+              Intenta con el número de parte (ej: TN-660) o el modelo de impresora.
             </p>
+            <a
+              href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(`Hola ToneBOX, busco el consumible: "${query || 'modelo no especificado'}". ¿Lo tienen disponible?`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 mt-6 px-6 py-3 rounded-2xl text-sm font-black transition-all hover:-translate-y-0.5"
+              style={{ background: '#25D366', color: 'white', textDecoration: 'none' }}
+            >
+              <MessageCircle className="w-4 h-4" />
+              ¿No lo encuentras? Pregúntanos por WhatsApp
+            </a>
           </div>
         ) : (
           <>

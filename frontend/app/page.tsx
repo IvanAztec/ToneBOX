@@ -34,6 +34,7 @@ interface Bundle {
   name: string;
   description?: string | null;
   price?: number | null;
+  comboType?: string;
 }
 
 function scorePriority(b: Bundle) {
@@ -50,10 +51,11 @@ function sortBundles(items: Bundle[]) {
 
 export default function HomePage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const [bundles, setBundles]         = useState<Bundle[]>([]);
-  const [selectedPrice, setPrice]     = useState(0);
-  const [selectedBundleId, setBundId] = useState<string | null>(null);
-  const [selectedName, setName]       = useState('Duo Pack ToneBox');
+  const [bundles, setBundles]           = useState<Bundle[]>([]);
+  const [selectedPrice, setPrice]       = useState(0);
+  const [selectedBundleId, setBundId]   = useState<string | null>(null);
+  const [selectedName, setName]         = useState('Duo Pack ToneBox');
+  const [selectedComboType, setComboType] = useState<string | null>(null);
   const [scrolled, setScrolled]       = useState(false);
   const [menuOpen, setMenuOpen]       = useState(false);
 
@@ -77,6 +79,7 @@ export default function HomePage() {
     setPrice(b.price);
     setBundId(b.id);
     setName(b.name);
+    setComboType(b.comboType ?? null);
     setTimeout(() => checkoutRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
   }
 
@@ -271,7 +274,7 @@ export default function HomePage() {
             <h2 className="font-syne font-extrabold text-center mb-8" style={{ fontSize: 28 }}>
               {selectedName}
             </h2>
-            <PaymentGateway basePrice={selectedPrice} productName={selectedName} />
+            <PaymentGateway basePrice={selectedPrice} productName={selectedName} comboType={selectedComboType ?? undefined} />
           </div>
         </section>
       )}
