@@ -5,6 +5,8 @@ interface Bundle {
   name: string;
   description?: string | null;
   price?: number | null;
+  speiPrice?: number | null;
+  freeShipping?: boolean;
 }
 
 interface Props {
@@ -56,6 +58,8 @@ export default function CombosSection({ bundles, onSelect }: Props) {
                 name={c.name}
                 desc={c.desc}
                 price={c.price}
+                speiPrice={parseFloat((c.price / 1.04).toFixed(0))}
+                freeShipping={true}
                 wasSaved={c.was - c.price}
                 cpp={c.cpp}
                 onSelect={() => onSelect({ id: `static-${i}`, name: c.name, description: c.desc, price: c.price })}
@@ -69,6 +73,8 @@ export default function CombosSection({ bundles, onSelect }: Props) {
                 name={b.name}
                 desc={b.description ?? ''}
                 price={b.price ?? 0}
+                speiPrice={b.speiPrice ?? null}
+                freeShipping={b.freeShipping ?? false}
                 wasSaved={b.price ? Math.round(b.price * 0.149) : 0}
                 cpp="$0.14"
                 onSelect={() => onSelect(b)}
@@ -86,12 +92,14 @@ interface CardProps {
   name: string;
   desc: string;
   price: number;
+  speiPrice: number | null;
+  freeShipping: boolean;
   wasSaved: number;
   cpp: string;
   onSelect: () => void;
 }
 
-function ComboCard({ index, name, desc, price, wasSaved, cpp, onSelect }: CardProps) {
+function ComboCard({ index, name, desc, price, speiPrice, freeShipping, wasSaved, cpp, onSelect }: CardProps) {
   const isFeatured = index === 1;
   const badge = BADGES[index] ?? BADGES[0];
   const icon = ICONS[index] ?? '🖨️';
@@ -128,19 +136,40 @@ function ComboCard({ index, name, desc, price, wasSaved, cpp, onSelect }: CardPr
       </ul>
 
       {/* Price row */}
-      <div className="flex items-end justify-between pt-5 mb-5" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-        <div>
-          <div className="font-syne font-extrabold" style={{ fontSize: 28, color: '#00C896', lineHeight: 1 }}>
-            ${price.toLocaleString('es-MX')} <span style={{ fontSize: 14 }}>MXN</span>
+      <div className="pt-5 mb-5" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="flex items-end justify-between mb-1">
+          <div>
+            <div className="font-syne font-extrabold" style={{ fontSize: 28, color: '#00C896', lineHeight: 1 }}>
+              ${price.toLocaleString('es-MX')} <span style={{ fontSize: 14 }}>MXN</span>
+            </div>
+            {speiPrice && (
+              <div className="flex items-center gap-1 mt-1">
+                <span style={{ fontSize: 12, color: '#25D366', fontWeight: 700 }}>
+                  ${speiPrice.toLocaleString('es-MX')} vía SPEI
+                </span>
+                <span style={{ fontSize: 9, background: 'rgba(37,211,102,0.15)', color: '#25D366', padding: '1px 5px', borderRadius: 4, fontWeight: 800 }}>
+                  -4%
+                </span>
+              </div>
+            )}
+            {wasSaved > 0 && (
+              <div style={{ fontSize: 12, color: '#7A8494', marginTop: 2 }}>Ahorras ${wasSaved.toLocaleString('es-MX')} MXN</div>
+            )}
           </div>
-          {wasSaved > 0 && (
-            <div style={{ fontSize: 13, color: '#7A8494', marginTop: 2 }}>Ahorras ${wasSaved.toLocaleString('es-MX')} MXN</div>
-          )}
+          <div className="font-mono text-right" style={{ fontSize: 11, color: '#7A8494' }}>
+            Costo/página<br />
+            <span style={{ fontSize: 16, color: 'white', fontWeight: 700 }}>{cpp}</span>
+          </div>
         </div>
-        <div className="font-mono text-right" style={{ fontSize: 11, color: '#7A8494' }}>
-          Costo/página<br />
-          <span style={{ fontSize: 16, color: 'white', fontWeight: 700 }}>{cpp}</span>
-        </div>
+        {freeShipping && (
+          <div
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 mt-2"
+            style={{ background: 'rgba(0,200,150,0.08)', border: '1px solid rgba(0,200,150,0.2)' }}
+          >
+            <span style={{ fontSize: 12 }}>🚚</span>
+            <span style={{ fontSize: 11, color: '#00C896', fontWeight: 700 }}>Envío Gratis incluido</span>
+          </div>
+        )}
       </div>
 
       {/* CTA */}

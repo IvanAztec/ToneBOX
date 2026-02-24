@@ -7,7 +7,7 @@
  * Estrategia única: generateSameProviderBundles(providerCode)
  *   - Fetches toners + drums del MISMO proveedor
  *   - Empareja por valores compartidos en compatibility[]
- *   - Precio: (toner.priceMXN + drum.priceMXN) * 0.87  (13% de ahorro)
+ *   - Precio: (toner.publicPrice + drum.publicPrice) * 0.87  (13% de ahorro)
  *
  * Proveedores válidos: CT (original), CADTONER (compatible, 30 drums), UNICOM (original), BOP (sin drums → skip)
  */
@@ -33,8 +33,8 @@ async function generateSameProviderBundles(providerCode) {
         include: { provider: { select: { code: true } } },
     });
 
-    const toners = products.filter(p => p.category === 'Toner' && p.priceMXN);
-    const drums  = products.filter(p => p.category === 'Drum'  && p.priceMXN);
+    const toners = products.filter(p => p.category === 'Toner' && p.publicPrice);
+    const drums  = products.filter(p => p.category === 'Drum'  && p.publicPrice);
 
     if (toners.length === 0 || drums.length === 0) {
         console.log(`[BundleGen] ${providerCode}: sin toners (${toners.length}) o drums (${drums.length}) — skip`);
@@ -61,14 +61,17 @@ async function generateSameProviderBundles(providerCode) {
 
             const sharedModels = toner.compatibility.filter(m => drum.compatibility.includes(m));
             const printerModel = sharedModels[0] ?? 'Kit';
-            const rawPrice     = toner.priceMXN + drum.priceMXN;
+            const rawPublic    = toner.publicPrice + drum.publicPrice;
+            const rawSpei      = (toner.speiPrice ?? toner.publicPrice) + (drum.speiPrice ?? drum.publicPrice);
 
             bundles.push({
                 name:               `Duo Pack ${typeLabel}${toner.brand ?? ''} ${printerModel}`.trim(),
                 description:        `${toner.name} + ${drum.name}`,
                 tonerId:            toner.id,
                 drumId:             drum.id,
-                price:              parseFloat((rawPrice * BUNDLE_DISCOUNT).toFixed(2)),
+                price:              parseFloat((rawPublic * BUNDLE_DISCOUNT).toFixed(2)),
+                speiPrice:          parseFloat((rawSpei  * BUNDLE_DISCOUNT).toFixed(2)),
+                freeShipping:       true, // Combo tóner + tambor = envío gratis
                 availabilityStatus: 'IN_STOCK',
             });
         }

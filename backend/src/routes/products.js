@@ -52,7 +52,7 @@ router.get('/', async (req, res) => {
         const products = await prisma.product.findMany({
             select: {
                 id: true, sku: true, name: true, brand: true, category: true,
-                priceMXN: true, productType: true, providerSku: true,
+                publicPrice: true, speiPrice: true, productType: true, providerSku: true,
                 compatibility: true, image: true, availabilityStatus: true,
                 updatedAt: true,
                 provider: { select: { name: true, code: true } },
@@ -170,12 +170,12 @@ router.get('/search', async (req, res) => {
             where,
             select: {
                 id: true, sku: true, name: true, brand: true, category: true,
-                priceMXN: true, productType: true, providerSku: true,
+                publicPrice: true, speiPrice: true, productType: true, providerSku: true,
                 compatibility: true, image: true, availabilityStatus: true,
                 provider: { select: { name: true, code: true } },
             },
             take: 60,
-            orderBy: { priceMXN: 'asc' },
+            orderBy: { publicPrice: 'asc' },
         });
 
         // ── Tier classification ───────────────────────────────────────────────

@@ -22,7 +22,8 @@ interface Product {
   name: string;
   brand: string | null;
   category: string | null;
-  priceMXN: number | null;
+  publicPrice: number | null;  // Precio público (costPrice × margen × 1.04)
+  speiPrice:   number | null;  // Precio SPEI (sin comisión 1.04)
   productType: string;
   providerSku: string | null;
   compatibility: string[];
@@ -111,10 +112,12 @@ function pairProducts(products: Product[]): ProductPair[] {
 function ComparisonCard({ pair, onSelect }: { pair: ProductPair; onSelect: Props['onSelectProduct'] }) {
   const { compatible, original } = pair;
   const main         = compatible ?? original!;
-  const compPrice    = compatible?.priceMXN ?? null;
-  const origPrice    = original?.priceMXN ?? null;
+  const compPrice    = compatible?.publicPrice ?? null;
+  const compSpei     = compatible?.speiPrice ?? null;
+  const origPrice    = original?.publicPrice ?? null;
   const savings      = compPrice && origPrice && origPrice > compPrice
     ? Math.round(origPrice - compPrice) : null;
+  const speiSavings  = compSpei && compPrice ? Math.round(compPrice - compSpei) : null;
   const displayPrice = compPrice ?? origPrice;
   const shortName    = main.name.length > 48 ? main.name.slice(0, 45) + '…' : main.name;
   const bestSeller   = isBestSeller(main);
@@ -197,7 +200,7 @@ function ComparisonCard({ pair, onSelect }: { pair: ProductPair; onSelect: Props
         {/* Precios */}
         <div className="space-y-0.5">
           {compPrice != null && (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-xl font-black" style={{ color: '#00C896' }}>
                 ${compPrice.toFixed(0)}
                 <span className="text-xs font-bold ml-1" style={{ color: 'rgba(0,200,150,0.7)' }}>MXN</span>
@@ -207,6 +210,16 @@ function ComparisonCard({ pair, onSelect }: { pair: ProductPair; onSelect: Props
                 style={{ background: 'rgba(0,200,150,0.15)', color: '#00C896' }}
               >
                 COMPATIBLE
+              </span>
+            </div>
+          )}
+          {compSpei != null && (
+            <div className="flex items-center gap-1">
+              <span className="text-xs font-bold" style={{ color: '#25D366' }}>
+                ${compSpei.toFixed(0)} MXN vía SPEI
+              </span>
+              <span className="text-[9px] font-black px-1 py-0.5 rounded" style={{ background: 'rgba(37,211,102,0.12)', color: '#25D366' }}>
+                -4%
               </span>
             </div>
           )}
@@ -357,7 +370,7 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
   const pairs         = pairProducts(cleanProducts);
   const withSavings   = pairs.filter(p =>
     p.compatible && p.original &&
-    (p.original.priceMXN ?? 0) > (p.compatible.priceMXN ?? 0)
+    (p.original.publicPrice ?? 0) > (p.compatible.publicPrice ?? 0)
   );
   const withoutPairs = pairs.filter(p => !withSavings.includes(p));
   const sortedPairs  = [...withSavings, ...withoutPairs];

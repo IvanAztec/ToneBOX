@@ -12,6 +12,7 @@
 import * as XLSX from 'xlsx';
 import { PrismaClient } from '@prisma/client';
 import { detectCategory } from './ctService.js';
+import { computePrices } from './pricingService.js';
 
 const prisma = new PrismaClient();
 
@@ -117,7 +118,8 @@ function parseCadtoner(buffer, providerId) {
             compatibility:      oemParts,                         // parte OEM = clave de búsqueda
             availabilityStatus: 'IN_STOCK',
             productType:        'COMPATIBLE',
-            priceMXN:           parseFloat(precioDistMXN.toFixed(2)),
+            costPrice:          parseFloat(precioDistMXN.toFixed(2)),
+            ...computePrices(precioDistMXN, 'COMPATIBLE'),
             image:              null,
             providerId,
             providerSku:        clave,
@@ -190,7 +192,8 @@ function parseBOP(buffer, providerId) {
             compatibility,
             availabilityStatus: 'IN_STOCK',
             productType:        'COMPATIBLE',
-            priceMXN:           parseFloat(precio.toFixed(2)),
+            costPrice:          parseFloat(precio.toFixed(2)),
+            ...computePrices(precio, 'COMPATIBLE'),
             image:              null,
             providerId,
             providerSku:        modelo || sku,
@@ -249,7 +252,7 @@ function parseUnicom(buffer, providerId) {
         const normalizedBrand = /hewlett|^hp$/i.test(marca) ? 'HP'
             : marca.charAt(0).toUpperCase() + marca.slice(1).toLowerCase();
 
-        const priceMXN = moneda === 'USD'
+        const costPrice = moneda === 'USD'
             ? parseFloat((precio * 17.5).toFixed(2))
             : parseFloat(precio.toFixed(2));
 
@@ -272,7 +275,8 @@ function parseUnicom(buffer, providerId) {
             compatibility,
             availabilityStatus: existencia > 0 ? 'IN_STOCK' : 'ON_DEMAND',
             productType:        'ORIGINAL',
-            priceMXN,
+            costPrice,
+            ...computePrices(costPrice, 'ORIGINAL'),
             image:              null,
             providerId,
             providerSku:        codFab || clave,

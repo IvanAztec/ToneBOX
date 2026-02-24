@@ -294,7 +294,9 @@ model Product {
   compatibility      String[]  @default([]) // Modelos de impresoras compatibles
   availabilityStatus String    @default("IN_STOCK") // IN_STOCK | ON_DEMAND | OUT_OF_STOCK
   productType String    @default("ORIGINAL")   // ORIGINAL | COMPATIBLE | HARDWARE
-  priceMXN    Float?   // Precio en MXN (calculado al ingestar)
+  costPrice   Float?   // Costo proveedor (PRIVADO — nunca al frontend)
+  publicPrice Float?   // Precio público = costPrice * margen * 1.04
+  speiPrice   Float?   // Precio SPEI = costPrice * margen (sin comisión 1.04)
   image       String?  // URL imagen CT
 
   providerId  String
@@ -318,7 +320,9 @@ model ProductBundle {
   description        String?
   tonerId            String
   drumId             String
-  price              Float?   // Optional bundle special price
+  price              Float?   // Precio público del bundle (publicPrices * descuento)
+  speiPrice          Float?   // Precio SPEI = price / 1.04
+  freeShipping       Boolean  @default(false) // Envío gratis — combos 2+ consumibles
   availabilityStatus String   @default("IN_STOCK") // IN_STOCK | ON_DEMAND | OUT_OF_STOCK
   
   // Timestamps

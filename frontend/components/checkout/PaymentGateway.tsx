@@ -41,9 +41,10 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
     const [result, setResult] = useState<{ folio: string; paymentId: string } | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
 
-    const discountRate = 0.04;
-    const discountAmount = method === 'spei' ? basePrice * discountRate : 0;
-    const finalPrice = basePrice - discountAmount;
+    // SPEI elimina el 1.04 de comisión operativa: speiPrice = publicPrice / 1.04
+    const speiPrice      = parseFloat((basePrice / 1.04).toFixed(2));
+    const discountAmount = method === 'spei' ? parseFloat((basePrice - speiPrice).toFixed(2)) : 0;
+    const finalPrice     = method === 'spei' ? speiPrice : basePrice;
 
     const handleCopy = async (text: string, type: 'clabe' | 'folio') => {
         await navigator.clipboard.writeText(text);
@@ -185,7 +186,7 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
                                     </div>
                                     <div className="text-left">
                                         <p className="font-bold text-gray-900">Transferencia SPEI</p>
-                                        <p className="text-xs text-green-600 font-black">Ahorras ${(basePrice * 0.04).toFixed(2)} — Beneficio VIP</p>
+                                        <p className="text-xs text-green-600 font-black">Ahorra un 4% adicional — ${(basePrice - basePrice / 1.04).toFixed(2)} MXN menos</p>
                                     </div>
                                 </div>
                                 {method === 'spei'

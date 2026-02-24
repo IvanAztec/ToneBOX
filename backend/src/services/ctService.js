@@ -13,6 +13,7 @@
  */
 
 import http from 'http';
+import { computePrices } from './pricingService.js';
 
 const CT_BASE_URL = process.env.CT_API_URL || 'http://connect.ctonline.mx:3001';
 const CT_CLIENTE  = process.env.CT_CLIENTE   || 'SLT0689';
@@ -269,7 +270,8 @@ export function mapCTProductToSchema(p, providerId) {
         compatibility:     extractPrinterModels(description),
         availabilityStatus: stock > 0 ? 'IN_STOCK' : 'ON_DEMAND',
         productType:       'ORIGINAL',
-        priceMXN:          normalizePriceMXN(p),
+        costPrice:         normalizePriceMXN(p),
+        ...computePrices(normalizePriceMXN(p), 'ORIGINAL'),
         image:             p.imagen || p.image || null,
         providerId,
         providerSku:       (p.clave || p.codigo || '').trim(),
