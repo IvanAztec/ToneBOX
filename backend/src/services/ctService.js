@@ -117,9 +117,9 @@ export async function getCTToken() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            cliente:   CT_CLIENTE,
-            rfc:       CT_RFC,
-            correo:    CT_CORREO,
+            cliente: CT_CLIENTE,
+            rfc:     CT_RFC,
+            email:   CT_CORREO,   // CT usa "email", no "correo"
         }),
     });
 
