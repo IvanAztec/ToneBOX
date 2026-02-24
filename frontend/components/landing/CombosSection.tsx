@@ -15,12 +15,13 @@ interface Props {
 }
 
 const BADGES = [
-  { label: 'Starter',   style: { background: 'rgba(255,92,40,0.15)', color: '#FF5C28', border: '1px solid rgba(255,92,40,0.3)' } },
+  { label: 'Starter',        style: { background: 'rgba(255,92,40,0.15)',  color: '#FF5C28', border: '1px solid rgba(255,92,40,0.3)' } },
   { label: '⭐ Más Rentable', style: { background: 'rgba(0,200,150,0.15)', color: '#00C896', border: '1px solid rgba(0,200,150,0.3)' } },
-  { label: 'Profesional', style: { background: 'rgba(26,107,255,0.15)', color: '#1A6BFF', border: '1px solid rgba(26,107,255,0.3)' } },
+  { label: 'Profesional',    style: { background: 'rgba(26,107,255,0.15)', color: '#1A6BFF', border: '1px solid rgba(26,107,255,0.3)' } },
+  { label: 'Enterprise',     style: { background: 'rgba(255,92,40,0.10)',  color: '#FF8C5E', border: '1px solid rgba(255,92,40,0.2)' } },
 ];
 
-const ICONS = ['💚', '🔥', '💼'];
+const ICONS = ['💚', '🔥', '💼', '🏆'];
 
 function waCombo(name: string) {
   const msg = encodeURIComponent(`¡Hola ToneBox! Me interesa el combo: ${name}. ¿Me pueden dar más información?`);
@@ -28,7 +29,7 @@ function waCombo(name: string) {
 }
 
 export default function CombosSection({ bundles, onSelect }: Props) {
-  const shown = bundles.slice(0, 3);
+  const shown = bundles.slice(0, 4);
 
   return (
     <section
@@ -47,13 +48,14 @@ export default function CombosSection({ bundles, onSelect }: Props) {
           La combinación perfecta de tóner + drum. Elige según tu volumen de impresión y empieza a ahorrar hoy.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {shown.length === 0 ? (
             // Fallback static combos if no API data
             [
-              { name: 'Startup Hero', desc: 'Brother DCP-B7535DW + 2 Toners TNB022', price: 4654, was: 5800, cpp: '$0.15' },
-              { name: 'Corporativo', desc: 'Brother MFC-L2540DW + 2 Toners XL TN660', price: 6438, was: 8200, cpp: '$0.14' },
-              { name: 'PYME Pro', desc: 'Brother MFC-L2550DW + 2 Toners TN730', price: 5854, was: 7400, cpp: '$0.30' },
+              { name: 'Startup Hero',  desc: 'Brother DCP-B7535DW + 2 Toners TNB022',    price: 4654, was: 5800, cpp: '$0.15' },
+              { name: 'Corporativo',   desc: 'Brother MFC-L2540DW + 2 Toners XL TN660',  price: 6438, was: 8200, cpp: '$0.14' },
+              { name: 'PYME Pro',      desc: 'Brother MFC-L2550DW + 2 Toners TN730',     price: 5854, was: 7400, cpp: '$0.30' },
+              { name: 'Enterprise',    desc: 'HP LaserJet Pro + 2 Toners CF283A',         price: 7850, was: 9500, cpp: '$0.12' },
             ].map((c, i) => (
               <ComboCard
                 key={i}
@@ -106,7 +108,7 @@ function ComboCard({ index, name, desc, price, wasSaved, cpp, onWa, onSelect }: 
 
   return (
     <div
-      className="rounded-3xl p-8 relative overflow-hidden transition-all duration-300 hover:-translate-y-1.5 cursor-default"
+      className="rounded-3xl p-6 relative overflow-hidden transition-all duration-300 hover:-translate-y-1.5 cursor-default"
       style={{
         background: isFeatured ? 'rgba(0,200,150,0.05)' : 'rgba(255,255,255,0.04)',
         border: isFeatured ? '1px solid rgba(0,200,150,0.3)' : '1px solid rgba(255,255,255,0.08)',

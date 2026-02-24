@@ -8,6 +8,12 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // ToneBOX brand tokens
+        ink:     '#0B0E14',
+        ink2:    '#161B26',
+        green:   '#00C896',
+        orange:  '#FF5C28',
+        muted:   '#7A8494',
         // ToneBOX v2 — Paleta Esmeralda/Verde
         primary: {
           50:  '#f0fdf4',
