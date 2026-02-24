@@ -50,7 +50,13 @@ router.get('/', async (req, res) => {
     try {
         const limit = Math.min(parseInt(req.query.limit) || 50, 200);
         const products = await prisma.product.findMany({
-            include: { provider: { select: { name: true, code: true } } },
+            select: {
+                id: true, sku: true, name: true, brand: true, category: true,
+                priceMXN: true, productType: true, providerSku: true,
+                compatibility: true, image: true, availabilityStatus: true,
+                updatedAt: true,
+                provider: { select: { name: true, code: true } },
+            },
             orderBy: { updatedAt: 'desc' },
             take: limit,
         });
@@ -159,10 +165,15 @@ router.get('/search', async (req, res) => {
 
         const where = conditions.length > 0 ? { AND: conditions } : {};
 
-        // Execute search — include provider for tier classification
+        // Execute search — select explícito para no filtrar campos internos
         const rawProducts = await prisma.product.findMany({
             where,
-            include: { provider: { select: { name: true, code: true } } },
+            select: {
+                id: true, sku: true, name: true, brand: true, category: true,
+                priceMXN: true, productType: true, providerSku: true,
+                compatibility: true, image: true, availabilityStatus: true,
+                provider: { select: { name: true, code: true } },
+            },
             take: 60,
             orderBy: { priceMXN: 'asc' },
         });

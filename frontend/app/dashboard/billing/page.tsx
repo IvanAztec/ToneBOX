@@ -1,281 +1,209 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { Check, CreditCard, Download, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ShoppingBag, Clock, CheckCircle, XCircle, CreditCard, Landmark, ChevronDown } from 'lucide-react';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 
-interface PricingPlan {
+interface Order {
   id: string;
-  name: string;
-  price: number;
-  interval: string;
-  description: string;
-  features: string[];
-  popular?: boolean;
+  folio: string;
+  productName: string;
+  amount: number;
+  status: string;
+  paymentMethod: string;
+  clientName?: string | null;
+  createdAt: string;
 }
 
-const plans: PricingPlan[] = [
-  {
-    id: 'basic',
-    name: 'Basic',
-    price: 9,
-    interval: 'month',
-    description: 'Perfect for getting started',
-    features: [
-      '5 team members',
-      '10 projects',
-      '5GB storage',
-      'Basic analytics',
-      'Email support',
-    ],
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    price: 29,
-    interval: 'month',
-    description: 'Best for growing teams',
-    features: [
-      '25 team members',
-      'Unlimited projects',
-      '100GB storage',
-      'Advanced analytics',
-      'Priority support',
-      'Custom integrations',
-      'API access',
-    ],
-    popular: true,
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: 99,
-    interval: 'month',
-    description: 'For large organizations',
-    features: [
-      'Unlimited team members',
-      'Unlimited projects',
-      'Unlimited storage',
-      'Custom analytics',
-      '24/7 phone support',
-      'Custom integrations',
-      'API access',
-      'SLA guarantee',
-      'Dedicated manager',
-    ],
-  },
-];
+const INK2   = '#161B26';
+const GREEN  = '#00C896';
+const ORANGE = '#FF5C28';
+const BORDER = 'rgba(255,255,255,0.08)';
+const MUTED  = '#7A8494';
 
-interface Invoice {
-  id: string;
-  date: string;
-  amount: string;
-  status: 'paid' | 'pending' | 'failed';
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
+  PENDING:    { label: 'Pendiente',  color: '#F59E0B', bg: 'rgba(245,158,11,0.1)',  icon: <Clock className="w-3.5 h-3.5" /> },
+  PAID:       { label: 'Pagado',     color: GREEN,     bg: 'rgba(0,200,150,0.1)',   icon: <CheckCircle className="w-3.5 h-3.5" /> },
+  CANCELLED:  { label: 'Cancelado',  color: ORANGE,    bg: 'rgba(255,92,40,0.1)',   icon: <XCircle className="w-3.5 h-3.5" /> },
+};
+
+const METHOD_CONFIG: Record<string, { label: string; icon: React.ReactNode }> = {
+  card:  { label: 'Tarjeta',  icon: <CreditCard className="w-3.5 h-3.5" /> },
+  spei:  { label: 'SPEI',     icon: <Landmark className="w-3.5 h-3.5" /> },
+  stripe:{ label: 'Tarjeta',  icon: <CreditCard className="w-3.5 h-3.5" /> },
+};
+
+function fmt(amount: number) {
+  return '$' + amount.toLocaleString('es-MX', { minimumFractionDigits: 0 }) + ' MXN';
 }
 
-const invoices: Invoice[] = [
-  { id: 'INV-001', date: 'Dec 1, 2024', amount: '$29.00', status: 'paid' },
-  { id: 'INV-002', date: 'Nov 1, 2024', amount: '$29.00', status: 'paid' },
-  { id: 'INV-003', date: 'Oct 1, 2024', amount: '$29.00', status: 'paid' },
-  { id: 'INV-004', date: 'Sep 1, 2024', amount: '$29.00', status: 'paid' },
-];
+function StatusBadge({ status }: { status: string }) {
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG['PENDING'];
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold"
+      style={{ color: cfg.color, background: cfg.bg }}
+    >
+      {cfg.icon}
+      {cfg.label}
+    </span>
+  );
+}
 
 export default function BillingPage() {
-  const [currentPlan] = useState('pro');
-  const [isAnnual, setIsAnnual] = useState(false);
+  const [orders, setOrders]   = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
-  const handleUpgrade = useCallback((planId: string) => {
-    console.log('Upgrading to plan:', planId);
-    // Implement Stripe checkout
+  useEffect(() => {
+    fetch('/api/orders')
+      .then(r => r.json())
+      .then(d => setOrders(d.orders ?? d.items ?? []))
+      .catch(() => setOrders([]))
+      .finally(() => setLoading(false));
   }, []);
 
-  const handleDownloadInvoice = useCallback((invoiceId: string) => {
-    console.log('Downloading invoice:', invoiceId);
-  }, []);
-
-  const toggleBilling = useCallback(() => {
-    setIsAnnual(prev => !prev);
-  }, []);
+  const paid    = orders.filter(o => o.status === 'PAID');
+  const pending = orders.filter(o => o.status === 'PENDING');
+  const total   = paid.reduce((s, o) => s + (o.amount ?? 0), 0);
 
   return (
     <DashboardLayout>
-      <div className="space-y-8">
+      <div className="space-y-6">
+
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Billing & Plans</h1>
-          <p className="text-gray-600 mt-1">
-            Manage your subscription and billing information
+          <div className="font-mono text-[10px] tracking-[3px] uppercase mb-1" style={{ color: GREEN }}>
+            // ToneBOX — Gestión de Tóners
+          </div>
+          <h1 className="font-syne text-2xl font-extrabold tracking-tight" style={{ color: 'white' }}>
+            Mis Pedidos
+          </h1>
+          <p className="text-sm mt-1" style={{ color: MUTED }}>
+            Historial de órdenes y comprobantes de pago
           </p>
         </div>
 
-        {/* Current Plan */}
-        <div className="bg-gradient-to-r from-primary-500 to-accent-500 rounded-xl p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-primary-100 text-sm">Current Plan</p>
-              <h2 className="text-2xl font-bold mt-1">Pro Plan</h2>
-              <p className="text-primary-100 mt-2">
-                Your next billing date is January 1, 2025
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-4xl font-bold">$29</p>
-              <p className="text-primary-100">/month</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Payment Method */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Method</h3>
-          <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-8 bg-gradient-to-r from-blue-600 to-blue-800 rounded flex items-center justify-center">
-                <CreditCard className="w-5 h-5 text-white" />
+        {/* Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[
+            { label: 'Total pagado',       val: fmt(total),         color: GREEN,   icon: <CheckCircle className="w-5 h-5" /> },
+            { label: 'Pedidos completados', val: String(paid.length),   color: GREEN,   icon: <ShoppingBag className="w-5 h-5" /> },
+            { label: 'En proceso',          val: String(pending.length), color: '#F59E0B', icon: <Clock className="w-5 h-5" /> },
+          ].map(s => (
+            <div
+              key={s.label}
+              className="rounded-2xl p-5 flex items-center gap-4"
+              style={{ background: INK2, border: `1px solid ${BORDER}` }}
+            >
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: `rgba(${s.color === GREEN ? '0,200,150' : '245,158,11'},0.12)`, color: s.color }}
+              >
+                {s.icon}
               </div>
               <div>
-                <p className="font-medium text-gray-900">•••• •••• •••• 4242</p>
-                <p className="text-sm text-gray-500">Expires 12/2025</p>
+                <p className="font-syne font-extrabold" style={{ fontSize: 20, color: 'white', lineHeight: 1 }}>{s.val}</p>
+                <p className="text-xs mt-0.5" style={{ color: MUTED }}>{s.label}</p>
               </div>
             </div>
-            <button className="text-primary-500 hover:text-primary-600 font-medium text-sm">
-              Update
-            </button>
-          </div>
+          ))}
         </div>
 
-        {/* Plans */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Available Plans</h3>
-            <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={toggleBilling}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  !isAnnual ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={toggleBilling}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isAnnual ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'
-                }`}
-              >
-                Annual
-                <span className="ml-1 text-xs text-green-600">Save 20%</span>
-              </button>
+        {/* Lista de pedidos */}
+        <div className="rounded-2xl overflow-hidden" style={{ background: INK2, border: `1px solid ${BORDER}` }}>
+          <div className="px-6 py-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
+            <h3 className="font-syne font-bold" style={{ color: 'white' }}>Historial de pedidos</h3>
+          </div>
+
+          {loading ? (
+            <div className="px-6 py-16 text-center">
+              <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3" style={{ borderColor: GREEN, borderTopColor: 'transparent' }} />
+              <p className="text-sm" style={{ color: MUTED }}>Cargando pedidos…</p>
             </div>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            {plans?.map((plan) => (
-              <div
-                key={plan.id}
-                className={`relative rounded-xl border-2 p-6 transition-all ${
-                  plan.id === currentPlan
-                    ? 'border-primary-500 bg-primary-50/50'
-                    : 'border-gray-100 hover:border-gray-200'
-                } ${plan.popular ? 'shadow-lg' : ''}`}
+          ) : orders.length === 0 ? (
+            <div className="px-6 py-16 text-center">
+              <ShoppingBag className="w-12 h-12 mx-auto mb-3" style={{ color: 'rgba(255,255,255,0.1)' }} />
+              <p className="font-semibold" style={{ color: MUTED }}>Aún no tienes pedidos</p>
+              <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.2)' }}>
+                Tus órdenes aparecerán aquí una vez que realices tu primer pedido
+              </p>
+              <a
+                href="/#combos"
+                className="inline-flex items-center gap-2 mt-5 px-5 py-2.5 rounded-xl font-syne font-bold text-sm transition-all hover:-translate-y-px"
+                style={{ background: GREEN, color: '#0B0E14' }}
               >
-                {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="bg-primary-500 text-white text-xs font-medium px-3 py-1 rounded-full">
-                      Most Popular
-                    </span>
-                  </div>
-                )}
-
-                <div className="text-center mb-6">
-                  <h4 className="text-lg font-semibold text-gray-900">{plan.name}</h4>
-                  <p className="text-sm text-gray-500 mt-1">{plan.description}</p>
-                  <div className="mt-4">
-                    <span className="text-4xl font-bold text-gray-900">
-                      ${isAnnual ? Math.round(plan.price * 0.8) : plan.price}
-                    </span>
-                    <span className="text-gray-500">/{plan.interval}</span>
-                  </div>
-                </div>
-
-                <ul className="space-y-3 mb-6">
-                  {plan.features?.map((feature, i) => (
-                    <li key={i} className="flex items-center gap-2 text-sm text-gray-600">
-                      <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-
-                <button
-                  onClick={() => handleUpgrade(plan.id)}
-                  disabled={plan.id === currentPlan}
-                  className={`w-full py-2 rounded-lg font-medium transition-colors ${
-                    plan.id === currentPlan
-                      ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
-                      : 'bg-primary-500 text-white hover:bg-primary-600'
-                  }`}
-                >
-                  {plan.id === currentPlan ? 'Current Plan' : 'Upgrade'}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Invoices */}
-        <div className="bg-white rounded-xl border border-gray-100">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900">Invoice History</h3>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {invoices?.length > 0 ? (
-              invoices.map((invoice) => (
-                <div
-                  key={invoice.id}
-                  className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
-                      <CreditCard className="w-5 h-5 text-gray-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{invoice.id}</p>
-                      <p className="text-sm text-gray-500">{invoice.date}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className="font-medium text-gray-900">{invoice.amount}</span>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        invoice.status === 'paid'
-                          ? 'bg-green-100 text-green-700'
-                          : invoice.status === 'pending'
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}
-                    >
-                      {invoice.status}
-                    </span>
+                Ver combos disponibles →
+              </a>
+            </div>
+          ) : (
+            <div>
+              {orders.map(order => {
+                const isOpen = expanded === order.id;
+                const methodCfg = METHOD_CONFIG[order.paymentMethod?.toLowerCase()] ?? METHOD_CONFIG['card'];
+                return (
+                  <div key={order.id} style={{ borderBottom: `1px solid ${BORDER}` }}>
                     <button
-                      onClick={() => handleDownloadInvoice(invoice.id)}
-                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                      onClick={() => setExpanded(isOpen ? null : order.id)}
+                      className="w-full px-6 py-4 flex items-center justify-between transition-colors text-left"
+                      style={{ background: isOpen ? 'rgba(255,255,255,0.02)' : 'transparent' }}
                     >
-                      <Download className="w-4 h-4 text-gray-500" />
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        {/* Folio */}
+                        <div
+                          className="font-mono font-bold text-sm px-2.5 py-1 rounded-lg flex-shrink-0"
+                          style={{ background: 'rgba(0,200,150,0.1)', color: GREEN }}
+                        >
+                          {order.folio || order.id.slice(0, 8)}
+                        </div>
+                        {/* Nombre */}
+                        <p className="text-sm font-medium truncate" style={{ color: 'rgba(255,255,255,0.85)' }}>
+                          {order.productName}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4 flex-shrink-0 ml-4">
+                        {/* Método */}
+                        <span className="hidden sm:inline-flex items-center gap-1.5 text-xs" style={{ color: MUTED }}>
+                          {methodCfg.icon}
+                          {methodCfg.label}
+                        </span>
+                        {/* Monto */}
+                        <span className="font-syne font-bold text-sm" style={{ color: 'white' }}>
+                          {fmt(order.amount)}
+                        </span>
+                        <StatusBadge status={order.status} />
+                        <ChevronDown
+                          className="w-4 h-4 transition-transform"
+                          style={{ color: MUTED, transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                        />
+                      </div>
                     </button>
+
+                    {/* Detalle expandible */}
+                    {isOpen && (
+                      <div className="px-6 pb-5" style={{ borderTop: `1px solid ${BORDER}` }}>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4">
+                          {[
+                            { l: 'Folio',          v: order.folio || '—' },
+                            { l: 'Método de pago', v: methodCfg.label },
+                            { l: 'Fecha',          v: new Date(order.createdAt).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) },
+                            { l: 'Total',          v: fmt(order.amount) },
+                          ].map(row => (
+                            <div key={row.l}>
+                              <p className="text-[10px] font-mono tracking-[2px] uppercase mb-1" style={{ color: 'rgba(255,255,255,0.3)' }}>{row.l}</p>
+                              <p className="text-sm font-semibold" style={{ color: 'white' }}>{row.v}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))
-            ) : (
-              <div className="px-6 py-12 text-center">
-                <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                <p className="text-gray-500">No invoices yet</p>
-              </div>
-            )}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </DashboardLayout>
   );
 }
-
