@@ -118,11 +118,12 @@ router.get('/brands', async (req, res) => {
 router.get('/bundles', async (req, res) => {
     try {
         const maxPrice = req.query.maxPrice ? parseFloat(req.query.maxPrice) : null;
+        const brand    = req.query.brand?.trim();
 
         const where = { availabilityStatus: { not: 'OUT_OF_STOCK' } };
-        if (maxPrice != null && !isNaN(maxPrice)) {
-            where.price = { lte: maxPrice };
-        }
+        if (maxPrice != null && !isNaN(maxPrice)) where.price = { lte: maxPrice };
+        // Filtro por marca: busca el nombre de la marca dentro del nombre del combo
+        if (brand) where.name = { contains: brand, mode: 'insensitive' };
 
         const bundles = await prisma.productBundle.findMany({
             where,

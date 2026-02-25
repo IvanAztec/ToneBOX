@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Loader2, Tag, Package, MessageCircle, ShoppingCart } from 'lucide-react';
+import { Search, Loader2, Tag, Package, MessageCircle, ShoppingCart, ChevronDown, ChevronUp } from 'lucide-react';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const WA_NUMBER      = '528441628536';
 const SHOWCASE_LIMIT = 4;
+const BUNDLE_LIMIT   = 4;
 
 const BEST_SELLER_SKUS = [
   '85A','78A','05A','80A','55A','64A','CF280A','CF226A','CF258A',
@@ -13,6 +14,9 @@ const BEST_SELLER_SKUS = [
   'TN-660','TN-630','TN-760','TN-227','TN-850',
   'TK-1175','TK-1162','TK-3182',
 ];
+
+// Marcas disponibles en el picker de Duo Packs
+const BUNDLE_BRANDS = ['hp','brother','samsung','canon','kyocera','xerox','lexmark'];
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -22,12 +26,12 @@ interface Product {
   name: string;
   brand: string | null;
   category: string | null;
-  publicPrice: number | null;  // Precio público (costPrice × margen × 1.04)
-  speiPrice:   number | null;  // Precio SPEI (sin comisión 1.04)
+  publicPrice: number | null;
+  speiPrice:   number | null;
   productType: string;
   providerSku: string | null;
   compatibility: string[];
-  yield?: number | null;       // Rendimiento en páginas
+  yield?: number | null;
   image?: string | null;
   provider?: { name: string; code: string } | null;
   tier?: string;
@@ -71,7 +75,20 @@ const BRAND_ORDER = ['hp','brother','canon','epson','kyocera','samsung','xerox',
 
 const NOISE_CATEGORIES = new Set(['Ribbon','Label','Paper','Consumible','Ink']);
 
-// Icono SVG de tambor/drum de impresora (cilindro OPC)
+const COMBO_LABELS: Record<string, string> = {
+  DUO_PACK:       'Duo Pack',
+  TRIPACK:        'TriPack',
+  BUSINESS_START: 'Business Start',
+};
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+/** Elimina tokens "000" y espacios múltiples en nombres de producto */
+function cleanName(raw: string): string {
+  return raw.replace(/\b0{3,}\b/g, '').replace(/\s+/g, ' ').trim();
+}
+
+// Icono SVG tambor OPC
 function OPCDrumIcon() {
   return (
     <svg viewBox="0 0 24 24" className="w-6 h-6 sm:w-7 sm:h-7" fill="none"
@@ -80,7 +97,7 @@ function OPCDrumIcon() {
       <ellipse cx="12" cy="18" rx="8" ry="3" />
       <line x1="4"  y1="6" x2="4"  y2="18" />
       <line x1="20" y1="6" x2="20" y2="18" />
-      <line x1="12" y1="3" x2="12" y2="6"  strokeWidth="1.2" />
+      <line x1="12" y1="3" x2="12" y2="6" strokeWidth="1.2" />
     </svg>
   );
 }
@@ -91,8 +108,6 @@ const QUICK_ACCESS: { id: string; icon: React.ReactNode; label: string }[] = [
   { id: 'bundles', icon: '💎',            label: 'Duo Packs' },
   { id: 'search',  icon: '🔍',            label: 'Buscador'  },
 ];
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function isBestSeller(p: Product): boolean {
   const text = `${p.name} ${p.sku} ${p.providerSku ?? ''}`.toUpperCase();
@@ -119,20 +134,131 @@ function pairProducts(products: Product[]): ProductPair[] {
   return pairs;
 }
 
-// ── BundleCard ─────────────────────────────────────────────────────────────────
+// ── Shared trust badge ────────────────────────────────────────────────────────
 
-const COMBO_LABELS: Record<string, string> = {
-  DUO_PACK:       'Duo Pack',
-  TRIPACK:        'TriPack',
-  BUSINESS_START: 'Business Start',
-};
+function TrustBadge() {
+  return (
+    <div className="flex items-center gap-1 text-[9px] font-bold" style={{ color: 'rgba(0,200,150,0.5)' }}>
+      <span>✓</span>
+      <span>Garantía ToneBOX: Satisfacción Total</span>
+    </div>
+  );
+}
+
+// ── CardSkeleton ──────────────────────────────────────────────────────────────
+
+function CardSkeleton() {
+  return (
+    <div
+      className="rounded-2xl p-5 space-y-3 animate-pulse"
+      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+    >
+      <div className="h-28 rounded-xl" style={{ background: 'rgba(255,255,255,0.08)' }} />
+      <div className="h-4 rounded w-3/4" style={{ background: 'rgba(255,255,255,0.08)' }} />
+      <div className="h-7 rounded w-1/3" style={{ background: 'rgba(255,255,255,0.08)' }} />
+      <div className="h-10 rounded-xl" style={{ background: 'rgba(255,255,255,0.08)' }} />
+    </div>
+  );
+}
+
+// ── BrandPickerForBundles ─────────────────────────────────────────────────────
+
+function BrandPickerForBundles({ onSelect }: { onSelect: (brand: string) => void }) {
+  return (
+    <div className="py-4">
+      <p className="text-sm font-semibold text-center mb-6" style={{ color: '#7A8494' }}>
+        ¿Combo de ahorro para qué marca?
+      </p>
+      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-w-xs sm:max-w-sm mx-auto">
+        {BUNDLE_BRANDS.map(b => {
+          const cfg = BRAND_CONFIG[b];
+          if (!cfg) return null;
+          return (
+            <button
+              key={b}
+              onClick={() => onSelect(b)}
+              className="py-4 px-2 rounded-2xl font-black text-sm transition-all active:scale-95 hover:-translate-y-0.5"
+              style={{
+                background: `${cfg.bg}1A`,
+                border:     `2px solid ${cfg.bg}55`,
+                color:      'white',
+              }}
+            >
+              {cfg.label}
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-xs text-center mt-5" style={{ color: 'rgba(255,255,255,0.2)' }}>
+        Cada combo incluye tóner Compatible + unidad de imagen
+      </p>
+    </div>
+  );
+}
+
+// ── RescueAssistant — Zero Results ────────────────────────────────────────────
+
+function RescueAssistant({ query, brand }: { query: string; brand: string | null }) {
+  const brandLabel = brand ? (BRAND_CONFIG[brand]?.label ?? brand.toUpperCase()) : '_____';
+  const waMsg = encodeURIComponent(
+    `Hola, no encontré el modelo "${query.trim() || 'desconocido'}" en la web.\n` +
+    `Mi impresora es marca: ${brandLabel}, usa: _____ y el modelo es: _____.\n` +
+    `¿Me ayudan?`
+  );
+  const waUrl = `https://wa.me/${WA_NUMBER}?text=${waMsg}`;
+
+  const guideItems = [
+    { emoji: '🔍', text: <span>¿Qué <strong>marca</strong> de impresora es?</span> },
+    { emoji: '💧', text: <span>¿Usa <strong>tóner o tinta</strong>?</span> },
+    { emoji: '🏷️', text: <span>¿Tienes el <strong>modelo exacto</strong> (impresora o consumible)?</span> },
+  ];
+
+  return (
+    <div className="py-10 max-w-md mx-auto text-center">
+      <div className="text-5xl mb-4">🔎</div>
+      <p className="font-bold text-base mb-2" style={{ color: 'white' }}>
+        Ese modelo no está en nuestra base de datos
+      </p>
+      <p className="text-sm mb-8" style={{ color: '#7A8494' }}>
+        Pero podemos asesorarte y ayudarte a encontrarlo...
+      </p>
+      <div className="space-y-2.5 mb-8 text-left">
+        {guideItems.map(({ emoji, text }, i) => (
+          <div
+            key={i}
+            className="flex items-center gap-3 px-4 py-3 rounded-xl"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+          >
+            <span className="text-xl shrink-0">{emoji}</span>
+            <p className="text-sm" style={{ color: 'rgba(255,255,255,0.65)' }}>{text}</p>
+          </div>
+        ))}
+      </div>
+      <a
+        href={waUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl text-sm font-black transition-all hover:-translate-y-0.5"
+        style={{ background: '#25D366', color: 'white', textDecoration: 'none' }}
+      >
+        <MessageCircle className="w-4 h-4" />
+        Chatea con un experto
+      </a>
+    </div>
+  );
+}
+
+// ── BundleCard ────────────────────────────────────────────────────────────────
 
 function BundleCard({ bundle, onSelect }: { bundle: Bundle; onSelect: Props['onSelectProduct'] }) {
-  const label  = COMBO_LABELS[bundle.comboType] ?? bundle.comboType;
-  const waMsg  = encodeURIComponent(
-    `Hola ToneBOX, me interesa el combo:\n*${bundle.name}*\nPrecio: $${bundle.price?.toFixed(0)} MXN\n¿Está disponible?`
+  const label    = COMBO_LABELS[bundle.comboType] ?? bundle.comboType;
+  const dispName = cleanName(bundle.name);
+  const waOrder  = encodeURIComponent(
+    `Hola ToneBOX, me interesa el combo:\n*${dispName}*\nPrecio: $${bundle.price?.toFixed(0)} MXN\n¿Está disponible?`
   );
-  const waUrl  = `https://wa.me/${WA_NUMBER}?text=${waMsg}`;
+  const waCompat = encodeURIComponent(
+    `Hola ToneBOX, ¿el combo "${dispName}" es compatible con mi impresora?`
+  );
 
   return (
     <div
@@ -159,7 +285,7 @@ function BundleCard({ bundle, onSelect }: { bundle: Bundle; onSelect: Props['onS
         </div>
 
         {/* Nombre */}
-        <p className="font-bold text-sm leading-snug" style={{ color: 'white' }}>{bundle.name}</p>
+        <p className="font-bold text-sm leading-snug" style={{ color: 'white' }}>{dispName}</p>
         {bundle.description && (
           <p className="text-xs" style={{ color: '#7A8494' }}>{bundle.description}</p>
         )}
@@ -186,11 +312,14 @@ function BundleCard({ bundle, onSelect }: { bundle: Bundle; onSelect: Props['onS
           </div>
         )}
 
+        {/* Trust badge */}
+        <TrustBadge />
+
         {/* CTAs */}
         {bundle.price != null && (
           <div className="mt-auto pt-1 flex gap-2">
             <a
-              href={waUrl}
+              href={`https://wa.me/${WA_NUMBER}?text=${waOrder}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex-1 flex items-center justify-center gap-1.5 text-xs font-bold py-2.5 rounded-xl transition-all active:scale-95"
@@ -200,7 +329,7 @@ function BundleCard({ bundle, onSelect }: { bundle: Bundle; onSelect: Props['onS
               Pedir por WhatsApp
             </a>
             <button
-              onClick={() => onSelect(bundle.name, bundle.price!)}
+              onClick={() => onSelect(dispName, bundle.price!)}
               className="hidden sm:flex px-3 py-2.5 rounded-xl transition-all active:scale-95 items-center"
               style={{ background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.12)' }}
               title="Apartar con tarjeta"
@@ -209,6 +338,19 @@ function BundleCard({ bundle, onSelect }: { bundle: Bundle; onSelect: Props['onS
             </button>
           </div>
         )}
+
+        {/* Visor de compatibilidad via WA */}
+        <a
+          href={`https://wa.me/${WA_NUMBER}?text=${waCompat}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-center pt-1 transition-colors"
+          style={{ color: 'rgba(255,255,255,0.28)', textDecoration: 'none' }}
+          onMouseEnter={e => (e.currentTarget.style.color = '#00C896')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.28)')}
+        >
+          ¿Es compatible con mi impresora?
+        </a>
       </div>
     </div>
   );
@@ -217,6 +359,8 @@ function BundleCard({ bundle, onSelect }: { bundle: Bundle; onSelect: Props['onS
 // ── ComparisonCard — Dark Theme ───────────────────────────────────────────────
 
 function ComparisonCard({ pair, onSelect }: { pair: ProductPair; onSelect: Props['onSelectProduct'] }) {
+  const [showCompat, setShowCompat] = useState(false);
+
   const { compatible, original } = pair;
   const main         = compatible ?? original!;
   const compPrice    = compatible?.publicPrice ?? null;
@@ -224,23 +368,19 @@ function ComparisonCard({ pair, onSelect }: { pair: ProductPair; onSelect: Props
   const origPrice    = original?.publicPrice ?? null;
   const savings      = compPrice && origPrice && origPrice > compPrice
     ? Math.round(origPrice - compPrice) : null;
-  const speiSavings  = compSpei && compPrice ? Math.round(compPrice - compSpei) : null;
   const displayPrice = compPrice ?? origPrice;
-  const shortName    = main.name.length > 48 ? main.name.slice(0, 45) + '…' : main.name;
+  const dispName     = cleanName(main.name.length > 48 ? main.name.slice(0, 45) + '…' : main.name);
   const bestSeller   = isBestSeller(main);
 
-  const waMsg = encodeURIComponent(`Hola, quiero apartar:\n*${main.name}*\nPrecio: $${displayPrice?.toFixed(0)} MXN\n¿Está disponible?`);
-  const waUrl = `https://wa.me/${WA_NUMBER}?text=${waMsg}`;
+  const waMsg  = encodeURIComponent(`Hola, quiero apartar:\n*${main.name}*\nPrecio: $${displayPrice?.toFixed(0)} MXN\n¿Está disponible?`);
+  const waUrl  = `https://wa.me/${WA_NUMBER}?text=${waMsg}`;
 
   return (
     <div
       className="rounded-2xl flex flex-col overflow-hidden transition-all duration-200 hover:-translate-y-0.5"
-      style={{
-        background: 'rgba(255,255,255,0.04)',
-        border: '1px solid rgba(255,255,255,0.08)',
-      }}
+      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
     >
-      {/* Imagen del producto */}
+      {/* Imagen */}
       {main.image && (
         <div
           className="relative h-28 sm:h-32 flex items-center justify-center overflow-hidden"
@@ -249,24 +389,18 @@ function ComparisonCard({ pair, onSelect }: { pair: ProductPair; onSelect: Props
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={main.image}
-            alt={shortName}
+            alt={dispName}
             loading="lazy"
             decoding="async"
             className="max-h-full max-w-full object-contain p-3"
           />
           {bestSeller && (
-            <span
-              className="absolute top-2 left-2 text-white text-[9px] font-black px-2 py-0.5 rounded-full"
-              style={{ background: '#FF5C28' }}
-            >
+            <span className="absolute top-2 left-2 text-white text-[9px] font-black px-2 py-0.5 rounded-full" style={{ background: '#FF5C28' }}>
               🔥 Top ventas
             </span>
           )}
           {savings !== null && savings > 50 && (
-            <span
-              className="absolute top-2 right-2 text-[9px] font-black px-2 py-0.5 rounded-full"
-              style={{ background: '#00C896', color: '#0B0E14' }}
-            >
+            <span className="absolute top-2 right-2 text-[9px] font-black px-2 py-0.5 rounded-full" style={{ background: '#00C896', color: '#0B0E14' }}>
               💰 -{savings} MXN
             </span>
           )}
@@ -278,18 +412,12 @@ function ComparisonCard({ pair, onSelect }: { pair: ProductPair; onSelect: Props
         {!main.image && (
           <div className="flex items-start gap-2 flex-wrap">
             {bestSeller && (
-              <span
-                className="text-[10px] font-black px-2 py-0.5 rounded-full"
-                style={{ background: 'rgba(255,92,40,0.15)', color: '#FF5C28' }}
-              >
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,92,40,0.15)', color: '#FF5C28' }}>
                 🔥 Top ventas
               </span>
             )}
             {savings !== null && savings > 50 && (
-              <span
-                className="text-[10px] font-black px-2 py-0.5 rounded-full"
-                style={{ background: 'rgba(0,200,150,0.15)', color: '#00C896' }}
-              >
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,200,150,0.15)', color: '#00C896' }}>
                 💰 Ahorras ${savings} MXN
               </span>
             )}
@@ -297,9 +425,9 @@ function ComparisonCard({ pair, onSelect }: { pair: ProductPair; onSelect: Props
         )}
 
         {/* Nombre */}
-        <p className="font-bold text-sm leading-snug" style={{ color: 'white' }}>{shortName}</p>
+        <p className="font-bold text-sm leading-snug" style={{ color: 'white' }}>{dispName}</p>
 
-        {/* Subtítulo — oculto en móvil */}
+        {/* Subtítulo */}
         <p className="hidden sm:block text-xs" style={{ color: '#7A8494' }}>
           {main.brand} · {main.category}
         </p>
@@ -319,10 +447,7 @@ function ComparisonCard({ pair, onSelect }: { pair: ProductPair; onSelect: Props
                 ${compPrice.toFixed(0)}
                 <span className="text-xs font-bold ml-1" style={{ color: 'rgba(0,200,150,0.7)' }}>MXN</span>
               </span>
-              <span
-                className="text-[10px] font-black px-1.5 py-0.5 rounded-full"
-                style={{ background: 'rgba(0,200,150,0.15)', color: '#00C896' }}
-              >
+              <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(0,200,150,0.15)', color: '#00C896' }}>
                 COMPATIBLE
               </span>
             </div>
@@ -346,10 +471,7 @@ function ComparisonCard({ pair, onSelect }: { pair: ProductPair; onSelect: Props
                 ${origPrice.toFixed(0)} MXN
               </span>
               {!compPrice && (
-                <span
-                  className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                  style={{ background: 'rgba(26,107,255,0.15)', color: '#1A6BFF' }}
-                >
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(26,107,255,0.15)', color: '#1A6BFF' }}>
                   ORIGINAL
                 </span>
               )}
@@ -357,7 +479,7 @@ function ComparisonCard({ pair, onSelect }: { pair: ProductPair; onSelect: Props
           )}
         </div>
 
-        {/* Mensaje ahorro — oculto en móvil */}
+        {/* Mensaje ahorro */}
         {savings !== null && savings > 50 && (
           <p
             className="hidden sm:block text-xs font-bold rounded-xl px-3 py-2"
@@ -366,6 +488,9 @@ function ComparisonCard({ pair, onSelect }: { pair: ProductPair; onSelect: Props
             💚 Ahorras ${savings} MXN vs el original de fábrica
           </p>
         )}
+
+        {/* Trust badge */}
+        <TrustBadge />
 
         {/* CTAs */}
         {displayPrice != null && (
@@ -390,23 +515,36 @@ function ComparisonCard({ pair, onSelect }: { pair: ProductPair; onSelect: Props
             </button>
           </div>
         )}
+
+        {/* Visor de compatibilidad expandible */}
+        {main.compatibility.length > 0 && (
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px', marginTop: '2px' }}>
+            <button
+              onClick={() => setShowCompat(p => !p)}
+              className="flex items-center gap-1 text-xs font-semibold w-full transition-colors"
+              style={{ color: showCompat ? '#00C896' : 'rgba(255,255,255,0.28)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            >
+              {showCompat
+                ? <ChevronUp   className="w-3 h-3 shrink-0" />
+                : <ChevronDown className="w-3 h-3 shrink-0" />}
+              {showCompat ? 'Ocultar modelos compatibles' : '¿Compatible con mi impresora?'}
+            </button>
+            {showCompat && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {main.compatibility.map((m, i) => (
+                  <span
+                    key={i}
+                    className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                    style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.45)' }}
+                  >
+                    {m}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
-    </div>
-  );
-}
-
-// ── Skeleton — Dark ───────────────────────────────────────────────────────────
-
-function CardSkeleton() {
-  return (
-    <div
-      className="rounded-2xl p-5 space-y-3 animate-pulse"
-      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
-    >
-      <div className="h-28 rounded-xl" style={{ background: 'rgba(255,255,255,0.08)' }} />
-      <div className="h-4 rounded w-3/4" style={{ background: 'rgba(255,255,255,0.08)' }} />
-      <div className="h-7 rounded w-1/3" style={{ background: 'rgba(255,255,255,0.08)' }} />
-      <div className="h-10 rounded-xl" style={{ background: 'rgba(255,255,255,0.08)' }} />
     </div>
   );
 }
@@ -417,19 +555,20 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
   const [brands, setBrands]                 = useState<string[]>([]);
   const [activeBrand, setActiveBrand]       = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [bundleBrand, setBundleBrand]       = useState<string | null>(null);
   const [query, setQuery]                   = useState('');
   const [products, setProducts]             = useState<Product[]>([]);
   const [bundles, setBundles]               = useState<Bundle[]>([]);
   const [loading, setLoading]               = useState(false);
   const [searched, setSearched]             = useState(false);
   const [showAll, setShowAll]               = useState(false);
+  const [showAllBundles, setShowAllBundles] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  // Keeps current query accessible inside effects without adding it to deps
   const queryRef       = useRef(query);
   useEffect(() => { queryRef.current = query; });
-  // Skip firing the brand/category effect on initial mount
   const didMount = useRef(false);
 
+  // ── Fetch brands on mount ───────────────────────────────────────────────
   useEffect(() => {
     fetch('/api/products/brands')
       .then(r => r.json())
@@ -440,6 +579,7 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
       .catch(() => setBrands(BRAND_ORDER));
   }, []);
 
+  // ── Product search ──────────────────────────────────────────────────────
   const doSearch = useCallback(async (brand: string | null, q: string, cat: string | null) => {
     if (!brand && !q.trim() && !cat) {
       setProducts([]);
@@ -464,13 +604,13 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
     }
   }, []);
 
-  const fetchBundles = useCallback(async () => {
+  // ── Bundle fetch (by brand) ─────────────────────────────────────────────
+  const fetchBundles = useCallback(async (brand: string) => {
     setLoading(true);
-    setSearched(true);
-    setShowAll(false);
+    setShowAllBundles(false);
     setProducts([]);
     try {
-      const res  = await fetch('/api/products/bundles');
+      const res  = await fetch(`/api/products/bundles?brand=${encodeURIComponent(brand)}`);
       const data = await res.json();
       setBundles(data.items ?? []);
     } catch {
@@ -480,33 +620,29 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
     }
   }, []);
 
-  // Reactive search: fires whenever brand or category filter changes.
-  // Uses queryRef so the current search term is always included without
-  // adding `query` to deps (which would fire on every keystroke).
-  // Bundles mode is handled separately via fetchBundles.
+  // ── Reactive search — brand/category changes (excludes bundles mode) ────
   useEffect(() => {
     if (!didMount.current) { didMount.current = true; return; }
-    if (activeCategory === 'bundles') return; // handled by handleQuickAccess
+    if (activeCategory === 'bundles') return;
     doSearch(activeBrand, queryRef.current, activeCategory);
   }, [activeBrand, activeCategory, doSearch]);
 
+  // ── Handlers ────────────────────────────────────────────────────────────
+  function exitBundleMode() {
+    setBundles([]);
+    setBundleBrand(null);
+  }
+
   function handleBrand(brand: string) {
-    // Clicking a brand exits bundles mode
-    if (activeCategory === 'bundles') {
-      setActiveCategory(null);
-      setBundles([]);
-    }
+    if (activeCategory === 'bundles') { setActiveCategory(null); exitBundleMode(); }
     setActiveBrand(prev => prev === brand ? null : brand);
   }
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    // Exit bundles mode on manual search
-    if (activeCategory === 'bundles') {
-      setActiveCategory(null);
-      setBundles([]);
-    }
-    doSearch(activeBrand, query, activeCategory === 'bundles' ? null : activeCategory);
+    const cat = activeCategory === 'bundles' ? null : activeCategory;
+    if (activeCategory === 'bundles') { setActiveCategory(null); exitBundleMode(); }
+    doSearch(activeBrand, query, cat);
   }
 
   function handleQuickAccess(id: string) {
@@ -516,34 +652,56 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
       return;
     }
     if (id === 'bundles') {
-      const isActive = activeCategory === 'bundles';
-      if (isActive) {
+      if (activeCategory === 'bundles') {
         setActiveCategory(null);
-        setBundles([]);
-        setSearched(false);
+        exitBundleMode();
       } else {
         setActiveBrand(null);
         setActiveCategory('bundles');
-        fetchBundles();
+        exitBundleMode(); // show brand picker first
       }
       return;
     }
-    // Other categories: exit bundles mode
-    setBundles([]);
-    setActiveCategory(prev => prev === id ? null : id);
+    // Regular category (Toner, Drum, etc.) — exit bundles if active
+    exitBundleMode();
+    setActiveCategory(prev => (prev === 'bundles' ? id : prev === id ? null : id));
   }
 
-  const cleanProducts = products.filter(p => !NOISE_CATEGORIES.has(p.category ?? ''));
-  const pairs         = pairProducts(cleanProducts);
-  const withSavings   = pairs.filter(p =>
-    p.compatible && p.original &&
-    (p.original.publicPrice ?? 0) > (p.compatible.publicPrice ?? 0)
+  function handleBundleBrand(brand: string) {
+    if (bundleBrand === brand) {
+      setBundleBrand(null);
+      setBundles([]);
+    } else {
+      setBundleBrand(brand);
+      fetchBundles(brand);
+    }
+  }
+
+  // ── Data computation ────────────────────────────────────────────────────
+  // Deduplicación: filtra productos con SKU normalizado repetido
+  const seen = new Set<string>();
+  const cleanProducts = products
+    .filter(p => !NOISE_CATEGORIES.has(p.category ?? ''))
+    .filter(p => {
+      const key = p.sku.toLowerCase().replace(/-/g, '');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+  const pairs        = pairProducts(cleanProducts);
+  const withSavings  = pairs.filter(p =>
+    p.compatible && p.original && (p.original.publicPrice ?? 0) > (p.compatible.publicPrice ?? 0)
   );
-  const withoutPairs = pairs.filter(p => !withSavings.includes(p));
-  const sortedPairs  = [...withSavings, ...withoutPairs];
+  const sortedPairs  = [...withSavings, ...pairs.filter(p => !withSavings.includes(p))];
   const visiblePairs = showAll ? sortedPairs : sortedPairs.slice(0, SHOWCASE_LIMIT);
   const hasMore      = sortedPairs.length > SHOWCASE_LIMIT;
 
+  const visibleBundles   = showAllBundles ? bundles : bundles.slice(0, BUNDLE_LIMIT);
+  const hasMoreBundles   = bundles.length > BUNDLE_LIMIT;
+  const bundleBrandLabel = bundleBrand ? (BRAND_CONFIG[bundleBrand]?.label ?? bundleBrand.toUpperCase()) : '';
+
+  // ── JSX ─────────────────────────────────────────────────────────────────
   return (
     <section
       id="consumibles"
@@ -625,7 +783,7 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
           })}
         </div>
 
-        {/* Search */}
+        {/* Search bar */}
         <form onSubmit={handleSearch} className="max-w-lg mx-auto mb-10">
           <div className="relative flex items-center">
             <Search className="absolute left-4 w-4 h-4 pointer-events-none" style={{ color: '#7A8494' }} />
@@ -642,8 +800,8 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
                 border:     '2px solid rgba(255,255,255,0.1)',
                 color:      'white',
               }}
-              onFocus={e  => (e.currentTarget.style.borderColor = '#00C896')}
-              onBlur={e   => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')}
+              onFocus={e => (e.currentTarget.style.borderColor = '#00C896')}
+              onBlur={e  => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')}
             />
             <button
               type="submit"
@@ -656,13 +814,84 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
           </div>
         </form>
 
-        {/* Results */}
+        {/* ── Results tree ── */}
         {loading ? (
+          // Skeleton
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
             {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
           </div>
 
+        ) : activeCategory === 'bundles' ? (
+          // ── DUO PACKS MODE ──────────────────────────────────────────────
+          !bundleBrand ? (
+            // Paso 1: Brand picker
+            <BrandPickerForBundles onSelect={handleBundleBrand} />
+
+          ) : bundles.length === 0 ? (
+            // Sin combos para esta marca
+            <div className="text-center py-16">
+              <Package className="w-12 h-12 mx-auto mb-4" style={{ color: 'rgba(255,255,255,0.1)' }} />
+              <p className="font-semibold mb-1" style={{ color: '#7A8494' }}>
+                No tenemos combos de {bundleBrandLabel} por ahora
+              </p>
+              <button
+                onClick={() => { setBundleBrand(null); setBundles([]); }}
+                className="text-xs mt-2"
+                style={{ color: '#00C896', background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                ← Elegir otra marca
+              </button>
+              <div className="mt-6">
+                <a
+                  href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(`Hola ToneBOX, ¿tienen combos Duo Pack de ${bundleBrandLabel}?`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-black transition-all hover:-translate-y-0.5"
+                  style={{ background: '#25D366', color: 'white', textDecoration: 'none' }}
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Preguntar por combos {bundleBrandLabel}
+                </a>
+              </div>
+            </div>
+
+          ) : (
+            // Grilla de combos
+            <>
+              <div className="flex items-center justify-between mb-5">
+                <p className="text-xs font-semibold" style={{ color: '#7A8494' }}>
+                  {bundles.length} combo{bundles.length !== 1 ? 's' : ''} {bundleBrandLabel}
+                  <span className="ml-2 font-black" style={{ color: '#00C896' }}>· Envío gratis incluido</span>
+                </p>
+                <button
+                  onClick={() => { setBundleBrand(null); setBundles([]); }}
+                  className="text-xs"
+                  style={{ color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  ← Cambiar marca
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                {visibleBundles.map(b => (
+                  <BundleCard key={b.id} bundle={b} onSelect={onSelectProduct} />
+                ))}
+              </div>
+              {hasMoreBundles && !showAllBundles && (
+                <div className="text-center mt-8">
+                  <button
+                    onClick={() => setShowAllBundles(true)}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all"
+                    style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.6)' }}
+                  >
+                    Explorar otros {bundles.length - BUNDLE_LIMIT} combos de ahorro de {bundleBrandLabel}
+                  </button>
+                </div>
+              )}
+            </>
+          )
+
         ) : !searched ? (
+          // ── WELCOME STATE ────────────────────────────────────────────────
           <div className="text-center py-16">
             <Package className="w-12 h-12 mx-auto mb-4" style={{ color: 'rgba(255,255,255,0.1)' }} />
             <p className="font-semibold" style={{ color: '#7A8494' }}>
@@ -673,63 +902,12 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
             </p>
           </div>
 
-        ) : activeCategory === 'bundles' ? (
-          /* ── Modo Duo Packs ── */
-          bundles.length === 0 ? (
-            <div className="text-center py-16">
-              <Search className="w-12 h-12 mx-auto mb-4" style={{ color: 'rgba(255,255,255,0.1)' }} />
-              <p className="font-semibold" style={{ color: '#7A8494' }}>No hay combos disponibles por ahora</p>
-              <a
-                href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Hola ToneBOX, ¿tienen combos Duo Pack o TriPack disponibles?')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 mt-6 px-6 py-3 rounded-2xl text-sm font-black transition-all hover:-translate-y-0.5"
-                style={{ background: '#25D366', color: 'white', textDecoration: 'none' }}
-              >
-                <MessageCircle className="w-4 h-4" />
-                Preguntar por combos en WhatsApp
-              </a>
-            </div>
-          ) : (
-            <>
-              <p className="text-xs font-semibold text-center mb-5" style={{ color: '#7A8494' }}>
-                {bundles.length} combo{bundles.length !== 1 ? 's' : ''} disponible{bundles.length !== 1 ? 's' : ''}
-                <span className="ml-2 font-black" style={{ color: '#00C896' }}>· Envío gratis incluido</span>
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-                {bundles.map(b => (
-                  <BundleCard key={b.id} bundle={b} onSelect={onSelectProduct} />
-                ))}
-              </div>
-            </>
-          )
-
         ) : sortedPairs.length === 0 ? (
-          <div className="text-center py-16">
-            <Search className="w-12 h-12 mx-auto mb-4" style={{ color: 'rgba(255,255,255,0.1)' }} />
-            <p className="font-semibold" style={{ color: '#7A8494' }}>Sin resultados para esa búsqueda</p>
-            <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.25)' }}>
-              Intenta con el número de parte (ej: TN-660) o el modelo de impresora.
-            </p>
-            <a
-              href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(
-                `Hola ToneBOX, busco ${
-                  activeBrand
-                    ? `tóner ${BRAND_CONFIG[activeBrand]?.label ?? activeBrand.toUpperCase()}`
-                    : 'un consumible'
-                }${query.trim() ? `, modelo: "${query.trim()}"` : ''}. ¿Lo tienen disponible?`
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 mt-6 px-6 py-3 rounded-2xl text-sm font-black transition-all hover:-translate-y-0.5"
-              style={{ background: '#25D366', color: 'white', textDecoration: 'none' }}
-            >
-              <MessageCircle className="w-4 h-4" />
-              ¿No lo encuentras? Pregúntanos por WhatsApp
-            </a>
-          </div>
+          // ── RESCUE ASSISTANT ─────────────────────────────────────────────
+          <RescueAssistant query={query} brand={activeBrand} />
 
         ) : (
+          // ── PRODUCT GRID ─────────────────────────────────────────────────
           <>
             <p className="text-xs font-semibold text-center mb-5" style={{ color: '#7A8494' }}>
               {sortedPairs.length} producto{sortedPairs.length !== 1 ? 's' : ''} encontrado{sortedPairs.length !== 1 ? 's' : ''}
@@ -739,23 +917,17 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
                 </span>
               )}
             </p>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
               {visiblePairs.map(pair => (
                 <ComparisonCard key={pair.key} pair={pair} onSelect={onSelectProduct} />
               ))}
             </div>
-
             {hasMore && (
               <div className="text-center mt-8">
                 <button
                   onClick={() => setShowAll(p => !p)}
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-all"
-                  style={{
-                    border:     '1px solid rgba(255,255,255,0.12)',
-                    background: 'rgba(255,255,255,0.04)',
-                    color:      'rgba(255,255,255,0.6)',
-                  }}
+                  style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.6)' }}
                 >
                   {showAll
                     ? '▲ Ver menos'
@@ -765,6 +937,7 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
             )}
           </>
         )}
+
       </div>
     </section>
   );
