@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { FiscalUpload } from '@/features/billing/FiscalUpload';
 import type { FiscalData } from '@/features/billing/types';
+import { COMPANY_DEFAULTS } from '@/features/company/useCompanySettings';
+import type { CompanySettings } from '@/features/company/useCompanySettings';
 
 const INK    = '#0B0E14';
 const INK2   = '#161B26';
@@ -269,12 +271,13 @@ function DataStep({ form, onChange, onCsfExtracted, user, saveToProfile, onSaveT
 }
 
 // ── Step 2: SPEI + Confirmar ───────────────────────────────────────────────────
-function SpeiStep({ cart, form, folio, onBack, onClose, onClear }: {
+function SpeiStep({ cart, form, folio, company, onBack, onClose, onClear }: {
   cart: CartItem[]; form: Form; folio: string;
+  company: CompanySettings;
   onBack: () => void; onClose: () => void; onClear: () => void;
 }) {
   const [copied, setCopied] = useState(false);
-  const CLABE     = '012180004567890123';
+  const CLABE     = company.clabeNumber;
   const speiTotal = cart.reduce((s, i) => s + (i.product.speiPrice ?? 0) * i.qty, 0);
   const addrLine  = [form.street, form.colonia, `${form.city} ${form.state}`, form.zip].filter(Boolean).join(', ');
 
@@ -290,7 +293,9 @@ function SpeiStep({ cart, form, folio, onBack, onClose, onClear }: {
         (form.csfUrl ? `\n   📎 CSF: ${form.csfUrl}` : '')
       : `\n\n🧾 Facturación: No solicitada`) +
     (addrLine ? `\n\n🚚 Dirección de entrega:\n   ${addrLine}` : '') +
-    `\n\n📎 Adjunto comprobante a continuación.\n\n_Enviado desde tonebox.mx/catalogo_`
+    `\n\n📎 Adjunto comprobante a continuación.` +
+    (company.comprobantesEmail ? `\n📧 También puedes enviarlo a: ${company.comprobantesEmail}` : '') +
+    `\n\n_Enviado desde tonebox.mx/catalogo_`
   );
 
   return (
@@ -315,7 +320,7 @@ function SpeiStep({ cart, form, folio, onBack, onClose, onClear }: {
         {/* Datos SPEI */}
         <div className="p-4 rounded-xl space-y-3" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
           <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: MUTED }}>Datos Bancarios SPEI</p>
-          {[['Banco', 'BBVA Bancomer'], ['Beneficiario', 'ToneBOX México S.A. de C.V.'], ['Concepto', `${folio} — ${form.name || 'Cliente'}`]].map(([l, v]) => (
+          {[['Banco', company.bankName], ['Beneficiario', company.beneficiario], ['Concepto', `${folio} — ${form.name || 'Cliente'}`]].map(([l, v]) => (
             <div key={l} className="flex justify-between items-start gap-2">
               <span className="text-[11px] flex-shrink-0" style={{ color: MUTED }}>{l}</span>
               <span className="text-xs font-bold text-right" style={{ color: 'rgba(255,255,255,0.8)' }}>{v}</span>
@@ -372,6 +377,7 @@ export function CheckoutDrawer({ cart, onClose, onUpdate, onRemoveItem, onClear 
 }) {
   const [step, setStep]          = useState(0);
   const [user, setUser]          = useState<UserProfile | null>(null);
+  const [company, setCompany]    = useState(COMPANY_DEFAULTS);
   const [saveToProfile, setSave] = useState(true);
   const [creating, setCreating]  = useState(false);
   const [folio, setFolio]        = useState('');
@@ -390,6 +396,13 @@ export function CheckoutDrawer({ cart, onClose, onUpdate, onRemoveItem, onClear 
       csfUrl:       url ?? form.csfUrl,
     });
   };
+
+  useEffect(() => {
+    fetch('/api/company-settings')
+      .then(r => r.json())
+      .then(d => { if (d.success) setCompany(d.data); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
@@ -471,7 +484,7 @@ export function CheckoutDrawer({ cart, onClose, onUpdate, onRemoveItem, onClear 
         style={{ width: 'min(420px,100vw)', background: INK2, borderLeft: `1px solid ${BORDER}` }}>
         {step === 0 && <CartStep cart={cart} onUpdate={onUpdate} onRemoveItem={onRemoveItem} onClear={onClear} onNext={() => setStep(1)} onClose={onClose} />}
         {step === 1 && <DataStep form={form} onChange={patch} onCsfExtracted={handleCsfExtracted} user={user} saveToProfile={saveToProfile} onSaveToggle={() => setSave(p => !p)} onBack={() => setStep(0)} onNext={goToSpei} loading={creating} />}
-        {step === 2 && <SpeiStep cart={cart} form={form} folio={folio} onBack={() => setStep(1)} onClose={onClose} onClear={onClear} />}
+        {step === 2 && <SpeiStep cart={cart} form={form} folio={folio} company={company} onBack={() => setStep(1)} onClose={onClose} onClear={onClear} />}
       </div>
     </>
   );

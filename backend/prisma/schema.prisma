@@ -498,6 +498,21 @@ model CatalogOrder {
   @@map("catalog_orders")
 }
 
+// Configuración global de la empresa (singleton id='tonebox')
+model CompanySettings {
+  id                String   @id @default("tonebox")
+  bankName          String   @default("BBVA Bancomer")
+  beneficiario      String   @default("ToneBox México S.A. de C.V.")
+  clabeNumber       String   @default("012180004567890123")
+  comprobantesEmail String   @default("pagos@tonebox.mx")
+  rfc               String?
+  razonSocial       String?
+  usoCFDI           String?
+  updatedAt         DateTime @updatedAt
+
+  @@map("company_settings")
+}
+
 // Dispatch type for providers and rules
 enum DispatchType {
   DIRECT

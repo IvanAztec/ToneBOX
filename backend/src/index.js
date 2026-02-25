@@ -21,6 +21,7 @@ import subscriptionRoutes from './routes/subscriptions.js';
 import catalogRoutes from './routes/catalog.js';
 import paymentRoutes from './routes/payments.js';
 import adminRoutes from './routes/admin.js';
+import companySettingsRoutes from './routes/companySettings.js';
 import { startCTSyncJob } from './jobs/ctSyncJob.js';
 
 const app = express();
@@ -74,6 +75,7 @@ apiRouter.use('/subscriptions', subscriptionRoutes);
 apiRouter.use('/catalog', catalogRoutes);
 apiRouter.use('/payments', paymentRoutes);
 apiRouter.use('/admin', adminRoutes);
+apiRouter.use('/company-settings', companySettingsRoutes);
 
 app.use(config.apiPrefix, apiRouter);
 
