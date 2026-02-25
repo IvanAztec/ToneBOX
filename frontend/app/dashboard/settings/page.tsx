@@ -4,8 +4,11 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   User, Building2, Phone, Mail, ArrowLeft, Pencil,
-  Save, X, Send, CheckCircle2, AlertTriangle, Loader2, Bot,
+  Save, X, Send, CheckCircle2, AlertTriangle, Loader2, Bot, Megaphone,
 } from 'lucide-react';
+
+interface Template { name: string; subtitle: string; emoji: string; template: string; }
+type Templates = { A: Template; B: Template; C: Template };
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import { useAuth } from '@/app/providers';
 
@@ -143,6 +146,55 @@ export default function SettingsPage() {
     }
     setEditing(false);
     setSaveResult(null);
+  };
+
+  // ── Templates de Marketing ────────────────────────────────────────────────
+  const [templates, setTemplates]         = useState<Templates | null>(null);
+  const [tplSaving, setTplSaving]         = useState(false);
+  const [tplResult, setTplResult]         = useState<{ ok: boolean; msg: string } | null>(null);
+  const [editingTpl, setEditingTpl]       = useState<'A' | 'B' | 'C' | null>(null);
+  const [tplDraft, setTplDraft]           = useState('');
+
+  useEffect(() => {
+    if (!authLoading) {
+      fetch('/api/admin/message-templates')
+        .then(r => r.json())
+        .then(d => { if (d.success) setTemplates(d.templates); })
+        .catch(() => {});
+    }
+  }, [authLoading]);
+
+  const startEditTpl = (key: 'A' | 'B' | 'C') => {
+    setEditingTpl(key);
+    setTplDraft(templates?.[key]?.template ?? '');
+    setTplResult(null);
+  };
+
+  const saveTpl = async () => {
+    if (!editingTpl || !templates) return;
+    const updated = { ...templates, [editingTpl]: { ...templates[editingTpl], template: tplDraft } };
+    setTplSaving(true);
+    setTplResult(null);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch('/api/admin/message-templates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ templates: updated }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTemplates(updated);
+        setEditingTpl(null);
+        setTplResult({ ok: true, msg: '✅ Template guardado.' });
+      } else {
+        setTplResult({ ok: false, msg: `❌ ${data.error}` });
+      }
+    } catch {
+      setTplResult({ ok: false, msg: '❌ No se pudo guardar.' });
+    } finally {
+      setTplSaving(false);
+    }
   };
 
   // ── Telegram ───────────────────────────────────────────────────────────────
@@ -286,6 +338,65 @@ export default function SettingsPage() {
             </div>
           )}
         </div>
+
+        {/* ── Templates de Marketing ── */}
+        {templates && (
+          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+              <Megaphone className="w-4 h-4 text-blue-500" />
+              <h2 className="font-bold text-gray-800">Templates de Marketing</h2>
+              <span className="text-xs text-gray-400 ml-auto">Variables: {'{nombre}'} {'{empresa}'} {'{modelo}'} {'{impresora}'} {'{daysRemaining}'} {'{daysAgo}'}</span>
+            </div>
+            <div className="divide-y divide-gray-50">
+              {(['A', 'B', 'C'] as const).map(key => {
+                const t = templates[key];
+                const isEditing = editingTpl === key;
+                return (
+                  <div key={key} className="px-5 py-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-black text-gray-900">{t.emoji} {key} — {t.name}</p>
+                        <p className="text-xs text-gray-400">{t.subtitle}</p>
+                      </div>
+                      {!isEditing ? (
+                        <button onClick={() => startEditTpl(key)} className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg transition-all">
+                          <Pencil className="w-3.5 h-3.5" />Editar
+                        </button>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button onClick={() => { setEditingTpl(null); setTplResult(null); }} className="text-xs font-bold text-gray-500 hover:bg-gray-100 px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1">
+                            <X className="w-3.5 h-3.5" />Cancelar
+                          </button>
+                          <button onClick={saveTpl} disabled={tplSaving} className="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 disabled:opacity-50">
+                            {tplSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                            Guardar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {isEditing ? (
+                      <textarea
+                        value={tplDraft}
+                        onChange={e => setTplDraft(e.target.value)}
+                        rows={5}
+                        className="w-full text-xs text-gray-800 border border-blue-300 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono leading-relaxed"
+                      />
+                    ) : (
+                      <p className="text-xs text-gray-500 bg-gray-50 rounded-xl px-3 py-2.5 whitespace-pre-wrap leading-relaxed font-mono line-clamp-3">
+                        {t.template}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {tplResult && (
+              <div className={`mx-5 mb-4 rounded-lg border p-3 text-sm font-medium ${tplResult.ok ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+                {tplResult.msg}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Telegram ── */}
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">

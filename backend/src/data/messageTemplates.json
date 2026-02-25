@@ -1,0 +1,20 @@
+{
+  "A": {
+    "name": "Urgencia — Rescate Inmediato",
+    "subtitle": "Para clientes con tóner agotado",
+    "emoji": "🚨",
+    "template": "Hola {nombre} 👋, espero que todo bien en {empresa}.\n\nTe escribo porque según nuestros registros tu tóner {modelo} se AGOTÓ hace {daysAgo} días. 😬\n\nCada hora sin imprimir es productividad perdida. Tenemos el compatible ToneBOX listo para entrega inmediata — ahorra hasta 70% vs el original y funciona perfecto.\n\n¿Lo coordinamos HOY? Responde *Rescate* y en minutos queda listo. 🚀"
+  },
+  "B": {
+    "name": "Prevención — Productividad",
+    "subtitle": "Para clientes con 3-10 días restantes",
+    "emoji": "⚠️",
+    "template": "Hola {nombre} 👋, espero que la semana vaya excelente en {empresa}.\n\nTe aviso que tu tóner {modelo} para la {impresora} tiene aproximadamente {daysRemaining} días de vida restante según nuestros registros.\n\n⚠️ Evita la interrupción de último minuto — pídelo hoy y lo tienes antes de que se acabe.\n\n¿Te lo coordino ahora? Responde *Adelante* y no paras un solo día de producción. 💪"
+  },
+  "C": {
+    "name": "Promoción — Pack 2×",
+    "subtitle": "Descuento por llevar 2 tóners",
+    "emoji": "🎯",
+    "template": "Hola {nombre} 👋, tenemos una oferta especial para {empresa} esta semana:\n\n🎯 *Lleva 2 tóners {modelo} y te damos 10% de descuento en el segundo.*\n\nAsí siempre tienes un repuesto listo y evitas el agotamiento de último minuto.\n\n¿Aprovechamos? Responde *Pack2* y te mando los detalles en un momento. 🛒"
+  }
+}

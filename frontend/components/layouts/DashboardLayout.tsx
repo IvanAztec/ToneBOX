@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, CreditCard, Users, Building2, Settings,
-  LogOut, Menu, X, Bell, Package, Truck, AlertTriangle,
+  LogOut, Menu, X, Bell, Package, Truck, AlertTriangle, Megaphone,
 } from 'lucide-react';
 import { useAuth } from '@/app/providers';
 import ToneBoxLogo from '@/components/shared/ToneBoxLogo';
@@ -22,6 +22,7 @@ const navigation: NavItem[] = [
   { name: 'Inventario CT',      href: '/admin/inventory',      icon: Package,       adminOnly: true },
   { name: 'Importar Catálogos', href: '/admin/providers',      icon: Truck,         adminOnly: true },
   { name: 'Zona Crítica',       href: '/admin/critical',       icon: AlertTriangle, adminOnly: true },
+  { name: 'Campañas de Cierre', href: '/admin/campanas',       icon: Megaphone,     adminOnly: true },
   { name: 'Mis Pedidos',        href: '/dashboard/billing',    icon: CreditCard },
   { name: 'Equipo',             href: '/dashboard/teams',      icon: Users },
   { name: 'Mi Empresa',         href: '/dashboard/workspaces', icon: Building2 },

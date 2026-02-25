@@ -11,6 +11,9 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { addDays, differenceInDays } from 'date-fns';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { sendTelegramMessage, getTelegramStatus } from '../services/telegramService.js';
 import {
     getCTToken,
@@ -21,6 +24,9 @@ import {
 import { downloadCTCatalogViaFTP } from '../services/ftpService.js';
 import { generateBundlesFromDB } from '../services/bundleGenerator.js';
 import { importProviderCatalog } from '../services/providerImportService.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const TEMPLATES_PATH = path.join(__dirname, '../data/messageTemplates.json');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -269,9 +275,10 @@ router.post('/providers/:code/import', async (req, res) => {
 
 // ── GET /api/admin/critical-alerts ───────────────────────────────────────────
 // Zona Crítica de Agotamiento — usuarios con ≤ 10 días de tóner restante
+// ?all=true → devuelve TODOS los clientes activos (para Campañas de Cierre)
 // Formula: exhaustionDate = lastRefillDate + floor(yield / consumptionRate) días
 router.get('/critical-alerts', async (req, res) => {
-    const CRITICAL_DAYS = 10;
+    const CRITICAL_DAYS = req.query.all === 'true' ? 9999 : 10;
     const WA_ADMIN = '528441628536';
 
     try {
@@ -377,6 +384,30 @@ router.get('/wa-template/:subscriptionId', async (req, res) => {
     } catch (error) {
         console.error('[WA Template] Error:', error.message);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// ── GET /api/admin/message-templates ─────────────────────────────────────────
+router.get('/message-templates', (_req, res) => {
+    try {
+        const raw = fs.readFileSync(TEMPLATES_PATH, 'utf8');
+        res.json({ success: true, templates: JSON.parse(raw) });
+    } catch {
+        res.status(500).json({ success: false, error: 'No se pudieron leer los templates' });
+    }
+});
+
+// ── PUT /api/admin/message-templates ─────────────────────────────────────────
+router.put('/message-templates', (req, res) => {
+    try {
+        const { templates } = req.body;
+        if (!templates?.A || !templates?.B || !templates?.C) {
+            return res.status(400).json({ success: false, error: 'Se requieren los templates A, B y C' });
+        }
+        fs.writeFileSync(TEMPLATES_PATH, JSON.stringify(templates, null, 2), 'utf8');
+        res.json({ success: true });
+    } catch {
+        res.status(500).json({ success: false, error: 'No se pudieron guardar los templates' });
     }
 });
 
