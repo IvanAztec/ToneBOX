@@ -24,6 +24,19 @@ import { importProviderCatalog } from '../services/providerImportService.js';
 const router = express.Router();
 const prisma = new PrismaClient();
 
+// ── WA Master Template ────────────────────────────────────────────────────────
+// Copy oficial: personalizado + cierre + CTA "Adelante"
+function buildWaMessage({ nombre, empresa, modelo, impresora, daysUsed, yieldPages }) {
+    return [
+        `Hola ${nombre}, espero que la semana vaya excelente en ${empresa}. 👋`,
+        `Soy de ToneBOX. Te escribo porque según nuestros registros, tu tóner ${modelo} para la ${impresora} está llegando a su zona crítica de agotamiento.`,
+        `📊 Llevas aproximadamente ${daysUsed} días de uso y el rendimiento estimado es de ${yieldPages} páginas.`,
+        `¿Te gustaría que te enviemos el reemplazo antes de que se acabe? Tenemos el compatible ToneBOX que funciona perfecto y puedes ahorrar hasta 70% vs el original.`,
+        `¡Que tengas un día muy productivo, quedo a la orden! 🙌`,
+        `Respóndeme con *Adelante* y en minutos te coordino el reemplazo. 🚀`,
+    ].join('\n\n');
+}
+
 // ── Upsert o crea el proveedor CT Internacional ───────────────────────────────
 async function ensureCTProvider() {
     return prisma.provider.upsert({
@@ -296,12 +309,7 @@ router.get('/critical-alerts', async (req, res) => {
             const daysUsed  = differenceInDays(today, new Date(sub.lastRefillDate));
             const waTarget  = (user?.whatsapp ?? '').replace(/\D/g, '') || WA_ADMIN;
 
-            const waMessage = [
-                `Hola ${nombre}, espero que la semana vaya excelente en ${empresa}. 👋`,
-                `Soy de ToneBOX. Te escribo porque según nuestros registros, tu tóner ${modelo} para la ${impresora} está llegando a su zona crítica de agotamiento.`,
-                `📊 Llevas aproximadamente ${daysUsed} días de uso y el rendimiento estimado es de ${sub.yield} páginas.`,
-                `¿Te gustaría que te enviemos el reemplazo antes de que se acabe? Tenemos el compatible ToneBOX que funciona perfecto y puedes ahorrar hasta 70% vs el original.`,
-            ].join('\n\n');
+            const waMessage = buildWaMessage({ nombre, empresa, modelo, impresora, daysUsed, yieldPages: sub.yield });
 
             alerts.push({
                 subscriptionId:  sub.id,
@@ -357,12 +365,7 @@ router.get('/wa-template/:subscriptionId', async (req, res) => {
         const daysUsed  = differenceInDays(today, new Date(sub.lastRefillDate));
         const waTarget  = (user?.whatsapp ?? '').replace(/\D/g, '') || WA_ADMIN;
 
-        const message = [
-            `Hola ${nombre}, espero que la semana vaya excelente en ${empresa}. 👋`,
-            `Soy de ToneBOX. Te escribo porque según nuestros registros, tu tóner ${modelo} para la ${impresora} está llegando a su zona crítica de agotamiento.`,
-            `📊 Llevas aproximadamente ${daysUsed} días de uso y el rendimiento estimado es de ${sub.yield} páginas.`,
-            `¿Te gustaría que te enviemos el reemplazo antes de que se acabe? Tenemos el compatible ToneBOX que funciona perfecto y puedes ahorrar hasta 70% vs el original.`,
-        ].join('\n\n');
+        const message = buildWaMessage({ nombre, empresa, modelo, impresora, daysUsed, yieldPages: sub.yield });
 
         res.json({
             waUrl:   `https://wa.me/${waTarget}?text=${encodeURIComponent(message)}`,
