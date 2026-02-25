@@ -21,7 +21,6 @@ const NAV_CONTACT = [
   { label: 'Saltillo, Coahuila',  href: '#' },
 ];
 
-const TECH_TAGS = ['Next.js 14', 'Supabase', 'Stripe + SPEI', 'Red Nacional'];
 
 export default function Footer() {
   const year = new Date().getFullYear();
@@ -88,17 +87,6 @@ export default function Footer() {
               Aztec Studio.Net
             </Link>
           </p>
-          <div className="flex gap-2 flex-wrap">
-            {TECH_TAGS.map(t => (
-              <span
-                key={t}
-                className="font-mono text-[9px] tracking-[1px] uppercase px-2 py-1 rounded"
-                style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.25)' }}
-              >
-                {t}
-              </span>
-            ))}
-          </div>
         </div>
       </div>
     </footer>
