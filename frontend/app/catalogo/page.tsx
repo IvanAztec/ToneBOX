@@ -1,139 +1,172 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import {
   Search, MessageCircle, Package, Printer, X,
-  Loader2, ShoppingCart, Tag,
+  Loader2, Tag, Menu, ChevronRight,
 } from 'lucide-react';
 import ToneBoxLogo from '@/components/shared/ToneBoxLogo';
+import Footer from '@/components/shared/Footer';
+
+// ── Design tokens (same as landing) ──────────────────────────────────────────
+const INK    = '#0B0E14';
+const INK2   = '#161B26';
+const GREEN  = '#00C896';
+const MUTED  = '#7A8494';
+const BORDER = 'rgba(255,255,255,0.08)';
+const CARD   = 'rgba(255,255,255,0.04)';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Product {
-  id: string;
-  sku: string;
-  name: string;
-  brand: string | null;
-  category: string | null;
-  publicPrice: number | null;
-  speiPrice: number | null;
-  productType: string | null;
-  compatibility: string | null;
-  image: string | null;
-  availabilityStatus: string;
+  id: string; sku: string; name: string; brand: string | null;
+  category: string | null; publicPrice: number | null; speiPrice: number | null;
+  productType: string | null; compatibility: string | null;
+  image: string | null; availabilityStatus: string; yield: number | null;
 }
 
-// ── Mapeo de categorías DB → etiquetas UI ────────────────────────────────────
+// ── Categorías ────────────────────────────────────────────────────────────────
 const CATEGORY_MAP: Record<string, string> = {
-  Toner:      'Tóners',
-  Cartucho:   'Tintas',
-  Drum:       'Tintas',      // drums → Tintas (consumibles de inyección)
-  Ribbon:     'Rollos TPV/Térmicos',
-  Label:      'Rollos TPV/Térmicos',
-  Paper:      'Rollos TPV/Térmicos',
+  Toner: 'Tóners', Cartucho: 'Tintas', Drum: 'Tintas',
+  Ribbon: 'Rollos TPV', Label: 'Rollos TPV', Paper: 'Rollos TPV',
 };
+const UI_CATS = ['Todos', 'Tóners', 'Tintas', 'Rollos TPV', 'Accesorios'] as const;
+type UICat = typeof UI_CATS[number];
 
-const UI_CATEGORIES = ['Todos', 'Tóners', 'Tintas', 'Rollos TPV/Térmicos', 'Accesorios'] as const;
-type UICategory = typeof UI_CATEGORIES[number];
-
-function mapToUI(dbCategory: string | null): UICategory {
-  if (!dbCategory) return 'Accesorios';
-  return (CATEGORY_MAP[dbCategory] as UICategory) ?? 'Accesorios';
+function mapToUI(cat: string | null): UICat {
+  if (!cat) return 'Accesorios';
+  return (CATEGORY_MAP[cat] as UICat) ?? 'Accesorios';
 }
 
-const CATEGORY_ICONS: Record<UICategory, React.ReactNode> = {
-  'Todos':              <Package className="w-4 h-4" />,
-  'Tóners':             <Printer className="w-4 h-4" />,
-  'Tintas':             <Tag className="w-4 h-4" />,
-  'Rollos TPV/Térmicos': <ShoppingCart className="w-4 h-4" />,
-  'Accesorios':         <Package className="w-4 h-4" />,
+const CAT_ICONS: Record<UICat, React.ReactNode> = {
+  'Todos':      <Package className="w-3.5 h-3.5" />,
+  'Tóners':     <Printer className="w-3.5 h-3.5" />,
+  'Tintas':     <Tag className="w-3.5 h-3.5" />,
+  'Rollos TPV': <Package className="w-3.5 h-3.5" />,
+  'Accesorios': <Package className="w-3.5 h-3.5" />,
 };
 
-const CATEGORY_COLORS: Record<UICategory, string> = {
-  'Todos':              'bg-gray-900 text-white border-gray-900',
-  'Tóners':             'bg-blue-600 text-white border-blue-600',
-  'Tintas':             'bg-purple-600 text-white border-purple-600',
-  'Rollos TPV/Térmicos': 'bg-amber-500 text-white border-amber-500',
-  'Accesorios':         'bg-gray-600 text-white border-gray-600',
-};
-
-const CATEGORY_INACTIVE = 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50';
-
-// ── Disponibilidad badge ──────────────────────────────────────────────────────
-function StatusBadge({ status }: { status: string }) {
-  if (status === 'IN_STOCK') {
-    return <span className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded">En stock</span>;
-  }
-  if (status === 'ON_DEMAND') {
-    return <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">Por encargo</span>;
-  }
-  return null;
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmt(n: number) {
+  return n.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
-// ── Tarjeta de producto ───────────────────────────────────────────────────────
-function ProductCard({ product }: { product: Product }) {
-  const waMessage = `Hola Iván, me interesa el producto ${product.name} (${product.sku}) del catálogo ToneBOX. ¿Podrías darme más información y precio?`;
-  const waUrl = `https://wa.me/528441628536?text=${encodeURIComponent(waMessage)}`;
+// ── Tarjeta de producto — dark theme ─────────────────────────────────────────
+function ProductCard({ p }: { p: Product }) {
+  const msg = encodeURIComponent(
+    `Hola Iván, me interesa el producto ${p.name} (${p.sku}) del catálogo ToneBOX. ¿Podrías darme precio y disponibilidad?`
+  );
+  const waUrl = `https://wa.me/528441628536?text=${msg}`;
+
+  const isStock   = p.availabilityStatus === 'IN_STOCK';
+  const isDemand  = p.availabilityStatus === 'ON_DEMAND';
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md hover:border-gray-200 transition-all group flex flex-col">
-      {/* Imagen o placeholder */}
-      <div className="aspect-square bg-gray-50 flex items-center justify-center overflow-hidden relative">
-        {product.image ? (
+    <div
+      className="flex flex-col rounded-2xl overflow-hidden group transition-all duration-200 hover:-translate-y-0.5"
+      style={{ background: CARD, border: `1px solid ${BORDER}` }}
+      onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(0,200,150,0.25)'}
+      onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.borderColor = BORDER}
+    >
+      {/* Imagen */}
+      <div
+        className="aspect-square flex items-center justify-center overflow-hidden relative"
+        style={{ background: 'rgba(255,255,255,0.03)' }}
+      >
+        {p.image ? (
           <img
-            src={product.image}
-            alt={product.name}
-            className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform"
+            src={p.image}
+            alt={p.name}
+            className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
-          <div className="flex flex-col items-center gap-2 text-gray-200">
-            <Package className="w-12 h-12" />
-            <span className="text-xs font-mono font-bold text-gray-300">{product.sku}</span>
+          <div className="flex flex-col items-center gap-2">
+            <Package className="w-10 h-10" style={{ color: 'rgba(255,255,255,0.1)' }} />
+            <span className="font-mono text-[10px] font-bold" style={{ color: 'rgba(255,255,255,0.2)' }}>{p.sku}</span>
           </div>
         )}
-        <div className="absolute top-2 right-2">
-          <StatusBadge status={product.availabilityStatus} />
+
+        {/* Badge disponibilidad */}
+        <div className="absolute top-2.5 left-2.5">
+          {isStock && (
+            <span
+              className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full"
+              style={{ background: 'rgba(0,200,150,0.15)', color: GREEN, border: '1px solid rgba(0,200,150,0.25)' }}
+            >
+              En stock
+            </span>
+          )}
+          {isDemand && (
+            <span
+              className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full"
+              style={{ background: 'rgba(255,180,0,0.12)', color: '#FFB400', border: '1px solid rgba(255,180,0,0.2)' }}
+            >
+              Por encargo
+            </span>
+          )}
         </div>
       </div>
 
       {/* Info */}
-      <div className="p-4 flex flex-col flex-1 gap-2">
-        <div className="flex-1">
-          {product.brand && (
-            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">{product.brand}</p>
+      <div className="flex flex-col flex-1 p-4 gap-3">
+        <div className="flex-1 space-y-1">
+          {p.brand && (
+            <p className="font-mono text-[9px] tracking-[2px] uppercase font-black" style={{ color: MUTED }}>
+              {p.brand}
+            </p>
           )}
-          <p className="text-sm font-bold text-gray-900 leading-snug mt-0.5 line-clamp-2">{product.name}</p>
-          {product.compatibility && (
-            <p className="text-xs text-gray-400 mt-1 flex items-center gap-1 line-clamp-1">
+          <p className="text-sm font-bold leading-snug line-clamp-2" style={{ color: 'rgba(255,255,255,0.9)' }}>
+            {p.name}
+          </p>
+          {p.compatibility && (
+            <p className="text-[11px] flex items-center gap-1 line-clamp-1 mt-1" style={{ color: MUTED }}>
               <Printer className="w-3 h-3 flex-shrink-0" />
-              {product.compatibility}
+              {p.compatibility}
+            </p>
+          )}
+          {p.yield && (
+            <p className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.25)' }}>
+              ~{p.yield.toLocaleString()} pág
             </p>
           )}
         </div>
 
         {/* Precio */}
-        {product.publicPrice && (
-          <div className="space-y-0.5">
-            <p className="text-lg font-black text-gray-900">
-              ${product.publicPrice.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+        {p.publicPrice && (
+          <div>
+            <p className="text-xl font-black" style={{ color: 'white' }}>
+              ${fmt(p.publicPrice)}
             </p>
-            {product.speiPrice && product.speiPrice < product.publicPrice && (
-              <p className="text-xs text-green-600 font-semibold">
-                ${product.speiPrice.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} con SPEI
+            {p.speiPrice && p.speiPrice < p.publicPrice && (
+              <p className="text-[11px] font-semibold" style={{ color: GREEN }}>
+                ${fmt(p.speiPrice)} con SPEI
               </p>
             )}
           </div>
         )}
 
-        {/* CTA WhatsApp */}
+        {/* CTA */}
         <a
           href={waUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white text-xs font-black py-2.5 rounded-xl transition-all mt-auto"
+          className="flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition-all"
+          style={{
+            background: 'rgba(37,211,102,0.1)',
+            color: '#25D366',
+            border: '1px solid rgba(37,211,102,0.2)',
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(37,211,102,0.18)';
+            (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(37,211,102,0.4)';
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(37,211,102,0.1)';
+            (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(37,211,102,0.2)';
+          }}
         >
-          <MessageCircle className="w-4 h-4" />
-          Solicitar por WhatsApp
+          <MessageCircle className="w-3.5 h-3.5" />
+          Solicitar
         </a>
       </div>
     </div>
@@ -142,10 +175,19 @@ function ProductCard({ product }: { product: Product }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function CatalogoPage() {
-  const [products, setProducts]     = useState<Product[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [search, setSearch]         = useState('');
-  const [activeCategory, setActiveCategory] = useState<UICategory>('Todos');
+  const [products, setProducts]           = useState<Product[]>([]);
+  const [loading, setLoading]             = useState(true);
+  const [search, setSearch]               = useState('');
+  const [activeCategory, setActiveCategory] = useState<UICat>('Todos');
+  const [scrolled, setScrolled]           = useState(false);
+  const [menuOpen, setMenuOpen]           = useState(false);
+  const searchRef                         = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 40);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -162,16 +204,11 @@ export default function CatalogoPage() {
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
-  // Filtrado combinado: categoría + búsqueda
   const filtered = useMemo(() => {
     let list = products.filter(p => p.availabilityStatus !== 'OUT_OF_STOCK');
-
-    if (activeCategory !== 'Todos') {
-      list = list.filter(p => mapToUI(p.category) === activeCategory);
-    }
-
+    if (activeCategory !== 'Todos') list = list.filter(p => mapToUI(p.category) === activeCategory);
     if (search.trim()) {
-      const q = search.toLowerCase().trim();
+      const q = search.toLowerCase();
       list = list.filter(p =>
         p.sku.toLowerCase().includes(q) ||
         p.name.toLowerCase().includes(q) ||
@@ -179,70 +216,142 @@ export default function CatalogoPage() {
         (p.compatibility ?? '').toLowerCase().includes(q)
       );
     }
-
     return list;
   }, [products, activeCategory, search]);
 
-  // Conteo por categoría
   const counts = useMemo(() => {
     const all = products.filter(p => p.availabilityStatus !== 'OUT_OF_STOCK');
-    const c: Partial<Record<UICategory, number>> = {};
-    UI_CATEGORIES.forEach(cat => {
-      c[cat] = cat === 'Todos' ? all.length : all.filter(p => mapToUI(p.category) === cat).length;
-    });
-    return c;
+    return Object.fromEntries(
+      UI_CATS.map(cat => [cat, cat === 'Todos' ? all.length : all.filter(p => mapToUI(p.category) === cat).length])
+    ) as Record<UICat, number>;
   }, [products]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen overflow-x-hidden" style={{ background: INK, color: 'white' }}>
 
-      {/* Header */}
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
-          <Link href="/">
-            <ToneBoxLogo size="sm" />
+      {/* ── Nav ── */}
+      <nav
+        style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+          padding: scrolled ? '10px 0' : '16px 0',
+          background: 'rgba(11,14,20,0.92)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: `1px solid ${BORDER}`,
+          transition: 'padding 0.3s',
+        }}
+      >
+        <div className="max-w-[1160px] mx-auto px-5 sm:px-8 flex items-center justify-between gap-4">
+
+          <Link href="/" className="flex-shrink-0">
+            <span className="block sm:hidden"><ToneBoxLogo size="sm" /></span>
+            <span className="hidden sm:block"><ToneBoxLogo showTagline /></span>
           </Link>
-          <div>
-            <h1 className="text-lg font-black text-gray-900 leading-tight">Catálogo de Consumibles</h1>
-            <p className="text-xs text-gray-400">Tóners · Tintas · Rollos · Accesorios</p>
-          </div>
-          <a
-            href="https://wa.me/528441628536?text=Hola+Iv%C3%A1n%2C+quiero+ver+el+cat%C3%A1logo+completo+de+ToneBOX"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden sm:flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white font-bold text-sm px-4 py-2.5 rounded-xl transition-all"
-          >
-            <MessageCircle className="w-4 h-4" />
-            Contactar
-          </a>
-        </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-
-        {/* Buscador */}
-        <div className="relative max-w-xl">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Busca por modelo de impresora, SKU o tipo de tóner..."
-            className="w-full pl-10 pr-10 py-3 bg-white border border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          {/* Breadcrumb */}
+          <div className="hidden md:flex items-center gap-2 flex-1">
+            <Link
+              href="/"
+              className="transition-colors"
+              style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}
+              onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.7)'}
+              onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.35)'}
             >
-              <X className="w-4 h-4" />
+              Inicio
+            </Link>
+            <ChevronRight className="w-3 h-3" style={{ color: 'rgba(255,255,255,0.2)' }} />
+            <span className="font-semibold" style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Catálogo</span>
+          </div>
+
+          {/* CTAs */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <a
+              href="https://wa.me/528441628536"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden sm:flex items-center gap-1.5 rounded-xl transition-all"
+              style={{ background: 'rgba(37,211,102,0.12)', color: '#25D366', border: '1px solid rgba(37,211,102,0.2)', padding: '8px 14px', fontSize: 12, fontWeight: 600 }}
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              WhatsApp
+            </a>
+            <button
+              className="md:hidden p-2 rounded-xl"
+              style={{ color: MUTED }}
+              onClick={() => setMenuOpen(p => !p)}
+            >
+              {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
-          )}
+          </div>
         </div>
+
+        {/* Mobile menu */}
+        {menuOpen && (
+          <div
+            className="md:hidden px-5 pb-4 pt-2 space-y-2"
+            style={{ borderTop: `1px solid ${BORDER}` }}
+          >
+            <Link href="/" className="block py-2 text-sm transition-colors hover:text-white" style={{ color: MUTED }}>
+              ← Volver al inicio
+            </Link>
+            <a href="https://wa.me/528441628536" target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-2 py-2 text-sm font-semibold" style={{ color: '#25D366' }}>
+              <MessageCircle className="w-4 h-4" />WhatsApp
+            </a>
+          </div>
+        )}
+      </nav>
+
+      {/* ── Hero strip ── */}
+      <section style={{ paddingTop: 90, paddingBottom: 40, background: `linear-gradient(180deg, ${INK2} 0%, ${INK} 100%)` }}>
+        <div className="max-w-[1160px] mx-auto px-5 sm:px-8">
+
+          <p className="font-mono text-[10px] tracking-[3px] uppercase mb-3 font-black" style={{ color: GREEN }}>
+            // Catálogo Completo
+          </p>
+          <h1 className="text-3xl sm:text-4xl font-black leading-tight mb-2">
+            Consumibles para <span style={{ color: GREEN }}>tu impresora</span>
+          </h1>
+          <p className="text-sm sm:text-base mb-8" style={{ color: MUTED }}>
+            Tóners, tintas y rollos para +300 modelos. Compatibles y originales. Envío a toda la República.
+          </p>
+
+          {/* Buscador */}
+          <div className="relative max-w-xl">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: MUTED }} />
+            <input
+              ref={searchRef}
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Busca por modelo de impresora, SKU o marca..."
+              className="w-full py-3.5 pl-11 pr-10 rounded-2xl text-sm outline-none transition-all"
+              style={{
+                background: 'rgba(255,255,255,0.06)',
+                border: `1px solid ${BORDER}`,
+                color: 'white',
+              }}
+              onFocus={e => (e.currentTarget as HTMLInputElement).style.borderColor = `rgba(0,200,150,0.4)`}
+              onBlur={e => (e.currentTarget as HTMLInputElement).style.borderColor = BORDER}
+            />
+            {search && (
+              <button
+                onClick={() => { setSearch(''); searchRef.current?.focus(); }}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full transition-colors"
+                style={{ color: MUTED }}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Contenido ── */}
+      <section className="max-w-[1160px] mx-auto px-5 sm:px-8 py-8 space-y-6">
 
         {/* Filtros por categoría */}
         <div className="flex gap-2 flex-wrap">
-          {UI_CATEGORIES.map(cat => {
+          {UI_CATS.map(cat => {
             const isActive = activeCategory === cat;
             const count = counts[cat] ?? 0;
             if (cat !== 'Todos' && count === 0) return null;
@@ -250,11 +359,24 @@ export default function CatalogoPage() {
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl border font-bold text-sm transition-all ${isActive ? CATEGORY_COLORS[cat] : CATEGORY_INACTIVE}`}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                style={{
+                  background: isActive ? 'rgba(0,200,150,0.12)' : 'rgba(255,255,255,0.04)',
+                  color: isActive ? GREEN : MUTED,
+                  border: `1px solid ${isActive ? 'rgba(0,200,150,0.3)' : BORDER}`,
+                }}
+                onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.07)'; }}
+                onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)'; }}
               >
-                {CATEGORY_ICONS[cat]}
+                <span style={{ color: isActive ? GREEN : MUTED }}>{CAT_ICONS[cat]}</span>
                 {cat}
-                <span className={`text-xs px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/20' : 'bg-gray-100 text-gray-500'}`}>
+                <span
+                  className="text-[10px] font-mono px-1.5 py-0.5 rounded-full"
+                  style={{
+                    background: isActive ? 'rgba(0,200,150,0.15)' : 'rgba(255,255,255,0.06)',
+                    color: isActive ? GREEN : 'rgba(255,255,255,0.3)',
+                  }}
+                >
                   {count}
                 </span>
               </button>
@@ -262,59 +384,86 @@ export default function CatalogoPage() {
           })}
         </div>
 
-        {/* Resultados */}
+        {/* Stats */}
+        {!loading && (
+          <p className="font-mono text-[11px]" style={{ color: 'rgba(255,255,255,0.25)' }}>
+            {filtered.length} producto{filtered.length !== 1 ? 's' : ''}
+            {search && <span> · búsqueda: "<span style={{ color: GREEN }}>{search}</span>"</span>}
+            {activeCategory !== 'Todos' && <span> · {activeCategory}</span>}
+          </p>
+        )}
+
+        {/* Grid */}
         {loading ? (
-          <div className="flex items-center justify-center py-32">
-            <Loader2 className="w-8 h-8 animate-spin text-gray-300" />
+          <div className="flex flex-col items-center justify-center py-32 gap-4">
+            <Loader2 className="w-8 h-8 animate-spin" style={{ color: GREEN }} />
+            <p className="text-sm" style={{ color: MUTED }}>Cargando catálogo...</p>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-24">
-            <Package className="w-12 h-12 mx-auto mb-3 text-gray-200" />
-            <p className="text-gray-400 font-medium">Sin resultados</p>
-            <p className="text-sm text-gray-300 mt-1">
-              {search ? `No encontramos "${search}"` : 'No hay productos en esta categoría'}
-            </p>
+          <div className="flex flex-col items-center justify-center py-32 gap-4 text-center">
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center"
+              style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${BORDER}` }}
+            >
+              <Package className="w-8 h-8" style={{ color: 'rgba(255,255,255,0.15)' }} />
+            </div>
+            <div>
+              <p className="font-bold" style={{ color: 'rgba(255,255,255,0.7)' }}>Sin resultados</p>
+              <p className="text-sm mt-1" style={{ color: MUTED }}>
+                {search ? `No encontramos "${search}"` : 'No hay productos en esta categoría'}
+              </p>
+            </div>
             {search && (
               <button
                 onClick={() => setSearch('')}
-                className="mt-4 text-sm text-blue-500 hover:underline"
+                className="text-sm font-semibold transition-colors"
+                style={{ color: GREEN }}
               >
                 Limpiar búsqueda
               </button>
             )}
           </div>
         ) : (
-          <>
-            <p className="text-xs text-gray-400 font-medium">
-              {filtered.length} producto{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}
-              {search && ` para "${search}"`}
-              {activeCategory !== 'Todos' && ` en ${activeCategory}`}
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {filtered.map(p => <ProductCard key={p.id} product={p} />)}
-            </div>
-          </>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {filtered.map(p => <ProductCard key={p.id} p={p} />)}
+          </div>
         )}
 
-      </main>
+      </section>
 
-      {/* Footer simple */}
-      <footer className="mt-16 border-t border-gray-100 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex items-center justify-between flex-wrap gap-4">
-          <ToneBoxLogo size="sm" />
-          <p className="text-xs text-gray-400">Tóners y consumibles compatibles y originales · Envío a todo México</p>
-          <a
-            href="https://wa.me/528441628536"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 text-green-600 font-bold text-sm hover:text-green-700"
-          >
-            <MessageCircle className="w-4 h-4" />
-            52 844 162 8536
-          </a>
-        </div>
-      </footer>
+      {/* ── CTA strip ── */}
+      {!loading && filtered.length > 0 && (
+        <section
+          className="py-14 mt-8"
+          style={{ background: INK2, borderTop: `1px solid ${BORDER}` }}
+        >
+          <div className="max-w-[1160px] mx-auto px-5 sm:px-8 text-center space-y-4">
+            <p className="font-mono text-[10px] tracking-[3px] uppercase font-black" style={{ color: GREEN }}>
+              // ¿No encuentras tu modelo?
+            </p>
+            <h2 className="text-2xl sm:text-3xl font-black">
+              Iván te ayuda a encontrar el tóner correcto
+            </h2>
+            <p className="text-sm" style={{ color: MUTED }}>
+              Escríbenos el modelo de tu impresora y cotizamos en minutos
+            </p>
+            <a
+              href="https://wa.me/528441628536?text=Hola+Iv%C3%A1n%2C+necesito+un+t%C3%B3ner+para+mi+impresora+y+no+lo+encuentro+en+el+cat%C3%A1logo"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl font-black text-sm transition-all"
+              style={{ background: GREEN, color: INK }}
+              onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.opacity = '0.9'}
+              onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.opacity = '1'}
+            >
+              <MessageCircle className="w-4 h-4" />
+              Cotizar por WhatsApp
+            </a>
+          </div>
+        </section>
+      )}
 
+      <Footer />
     </div>
   );
 }
