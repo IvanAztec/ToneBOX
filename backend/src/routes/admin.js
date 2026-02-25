@@ -11,6 +11,7 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { addDays, differenceInDays } from 'date-fns';
+import { sendTelegramMessage, getTelegramStatus } from '../services/telegramService.js';
 import {
     getCTToken,
     getCTExistencia,
@@ -376,6 +377,24 @@ router.get('/wa-template/:subscriptionId', async (req, res) => {
     } catch (error) {
         console.error('[WA Template] Error:', error.message);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// ── GET /api/admin/telegram/status ───────────────────────────────────────────
+router.get('/telegram/status', (_req, res) => {
+    res.json(getTelegramStatus());
+});
+
+// ── POST /api/admin/telegram/test ────────────────────────────────────────────
+// Envía el mensaje de prueba: "Hola Iván, la Fábrica ToneBOX está conectada"
+router.post('/telegram/test', async (_req, res) => {
+    try {
+        const msg = '🏭 <b>Hola Iván, la Fábrica ToneBOX está conectada.</b>\n\nEl sistema de alertas está activo y listo para enviarte notificaciones de Zona Crítica de Agotamiento. ✅';
+        const result = await sendTelegramMessage(msg);
+        res.json({ success: true, messageId: result.message_id });
+    } catch (error) {
+        console.error('[Telegram Test] Error:', error.message);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

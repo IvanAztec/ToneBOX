@@ -146,26 +146,26 @@ export default function CriticalAlertsPage() {
           </div>
         )}
 
-        {/* Table */}
+        {/* Table — 5 cols, Acción sticky right para siempre visible */}
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="text-left px-4 py-3 font-semibold text-gray-600">Urgencia</th>
-                  <th className="text-left px-4 py-3 font-semibold text-gray-600">Cliente</th>
-                  <th className="text-left px-4 py-3 font-semibold text-gray-600">Empresa</th>
-                  <th className="text-left px-4 py-3 font-semibold text-gray-600">Impresora</th>
-                  <th className="text-left px-4 py-3 font-semibold text-gray-600">Tóner</th>
-                  <th className="text-left px-4 py-3 font-semibold text-gray-600">Agotamiento</th>
-                  <th className="text-left px-4 py-3 font-semibold text-gray-600">Acción</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-600 w-24">Urgencia</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-600">Cliente · Empresa</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-600">Tóner · Impresora</th>
+                  <th className="text-left px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Agotamiento</th>
+                  <th className="text-left px-3 py-3 font-semibold text-gray-600 sticky right-0 bg-gray-50 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.06)]">
+                    Acción
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 7 }).map((_, j) => (
+                      {Array.from({ length: 5 }).map((_, j) => (
                         <td key={j} className="px-4 py-3">
                           <div className="h-4 bg-gray-100 rounded animate-pulse" />
                         </td>
@@ -174,7 +174,7 @@ export default function CriticalAlertsPage() {
                   ))
                 ) : alerts.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-16 text-center">
+                    <td colSpan={5} className="px-4 py-16 text-center">
                       <CheckCircle2 className="w-10 h-10 text-green-300 mx-auto mb-3" />
                       <p className="text-gray-400 font-medium">Sin alertas críticas</p>
                       <p className="text-xs text-gray-300 mt-1">
@@ -191,45 +191,43 @@ export default function CriticalAlertsPage() {
                       <td className="px-4 py-3">
                         <DaysBadge days={alert.daysRemaining} isUrgent={alert.isUrgent} />
                       </td>
+
+                      {/* Cliente + Empresa fusionados */}
                       <td className="px-4 py-3">
-                        <p className="font-semibold text-gray-900">{alert.user.name}</p>
+                        <p className="font-semibold text-gray-900 leading-tight">{alert.user.name}</p>
                         {alert.user.cargo && (
                           <p className="text-xs text-gray-400">{alert.user.cargo}</p>
                         )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {alert.user.empresa ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded font-medium">
+                        {alert.user.empresa && (
+                          <span className="inline-flex items-center gap-1 text-xs text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded mt-1">
                             <Building2 className="w-3 h-3" />
                             {alert.user.empresa}
                           </span>
-                        ) : (
-                          <span className="text-gray-300 text-xs">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        {alert.printerModel ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-gray-600">
-                            <Printer className="w-3 h-3" />
-                            {alert.printerModel}
-                          </span>
-                        ) : (
-                          <span className="text-gray-300 text-xs">—</span>
-                        )}
-                      </td>
+
+                      {/* Tóner + Impresora fusionados */}
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1 text-xs font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded font-mono">
                           <Package className="w-3 h-3" />
                           {alert.product.sku}
                         </span>
                         <p className="text-xs text-gray-400 mt-0.5">
-                          {alert.yield.toLocaleString()} págs · {alert.consumptionRate}/día
+                          {alert.yield.toLocaleString()} p · {alert.consumptionRate}/día
                         </p>
+                        {alert.printerModel && (
+                          <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                            <Printer className="w-3 h-3" />{alert.printerModel}
+                          </p>
+                        )}
                       </td>
+
                       <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                         {formatDate(alert.exhaustionDate)}
                       </td>
-                      <td className="px-4 py-3">
+
+                      {/* Acción — sticky right */}
+                      <td className="px-3 py-3 sticky right-0 bg-white shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.06)]">
                         <button
                           onClick={() => handleWA(alert)}
                           disabled={openingWa === alert.subscriptionId}
