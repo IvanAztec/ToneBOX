@@ -23,7 +23,14 @@ model User {
   customerNumber Int       @unique @default(autoincrement())
   estimatedConsumptionRate Float?
   emailVerified  DateTime?
-  
+
+  // Profile — SaaS Factory Data Engine
+  empresa        String?
+  cargo          String?
+  ciudad         String?
+  estado         String?
+  origenUTM      String?
+
   // Relations
   workspaces     WorkspaceMember[]
   ownedWorkspaces Workspace[] @relation("WorkspaceOwner")

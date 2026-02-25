@@ -10,6 +10,7 @@
 
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
+import { addDays, differenceInDays } from 'date-fns';
 import {
     getCTToken,
     getCTExistencia,
@@ -250,6 +251,129 @@ router.post('/providers/:code/import', async (req, res) => {
     req.on('error', err => {
         res.status(500).json({ error: err.message });
     });
+});
+
+// ── GET /api/admin/critical-alerts ───────────────────────────────────────────
+// Zona Crítica de Agotamiento — usuarios con ≤ 10 días de tóner restante
+// Formula: exhaustionDate = lastRefillDate + floor(yield / consumptionRate) días
+router.get('/critical-alerts', async (req, res) => {
+    const CRITICAL_DAYS = 10;
+    const WA_ADMIN = '528441628536';
+
+    try {
+        const today = new Date();
+        const subs = await prisma.replenishmentSubscription.findMany({
+            where: { status: 'active' },
+            orderBy: { nextReminderDate: 'asc' },
+        });
+
+        const alerts = [];
+
+        for (const sub of subs) {
+            if (!sub.consumptionRate || sub.consumptionRate <= 0) continue;
+
+            const daysTotal     = Math.floor(sub.yield / sub.consumptionRate);
+            const exhaustionDate = addDays(new Date(sub.lastRefillDate), daysTotal);
+            const daysRemaining  = differenceInDays(exhaustionDate, today);
+
+            if (daysRemaining > CRITICAL_DAYS) continue;
+
+            const [user, product] = await Promise.all([
+                prisma.user.findUnique({
+                    where:  { id: sub.userId },
+                    select: { id: true, name: true, email: true, whatsapp: true, empresa: true, cargo: true },
+                }),
+                prisma.product.findUnique({
+                    where:  { id: sub.productId },
+                    select: { name: true, sku: true, publicPrice: true, speiPrice: true },
+                }),
+            ]);
+
+            const nombre    = user?.name    ?? 'Cliente';
+            const empresa   = user?.empresa ?? 'tu empresa';
+            const modelo    = product?.sku  ?? 'tóner';
+            const impresora = sub.printerModel ?? 'tu impresora';
+            const daysUsed  = differenceInDays(today, new Date(sub.lastRefillDate));
+            const waTarget  = (user?.whatsapp ?? '').replace(/\D/g, '') || WA_ADMIN;
+
+            const waMessage = [
+                `Hola ${nombre}, espero que la semana vaya excelente en ${empresa}. 👋`,
+                `Soy de ToneBOX. Te escribo porque según nuestros registros, tu tóner ${modelo} para la ${impresora} está llegando a su zona crítica de agotamiento.`,
+                `📊 Llevas aproximadamente ${daysUsed} días de uso y el rendimiento estimado es de ${sub.yield} páginas.`,
+                `¿Te gustaría que te enviemos el reemplazo antes de que se acabe? Tenemos el compatible ToneBOX que funciona perfecto y puedes ahorrar hasta 70% vs el original.`,
+            ].join('\n\n');
+
+            alerts.push({
+                subscriptionId:  sub.id,
+                daysRemaining,
+                exhaustionDate:  exhaustionDate.toISOString(),
+                isUrgent:        daysRemaining <= 3,
+                user:            user ?? { id: sub.userId, name: 'Desconocido' },
+                product:         product ?? { name: 'Desconocido', sku: sub.productId },
+                printerModel:    sub.printerModel,
+                yield:           sub.yield,
+                consumptionRate: sub.consumptionRate,
+                waUrl:           `https://wa.me/${waTarget}?text=${encodeURIComponent(waMessage)}`,
+            });
+        }
+
+        alerts.sort((a, b) => a.daysRemaining - b.daysRemaining);
+        res.json({ total: alerts.length, alerts });
+
+    } catch (error) {
+        console.error('[Critical Alerts] Error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ── GET /api/admin/wa-template/:subscriptionId ────────────────────────────────
+// Genera URL de WhatsApp con el copy template personalizado para un cliente
+router.get('/wa-template/:subscriptionId', async (req, res) => {
+    const { subscriptionId } = req.params;
+    const WA_ADMIN = '528441628536';
+
+    try {
+        const sub = await prisma.replenishmentSubscription.findUnique({
+            where: { id: subscriptionId },
+        });
+        if (!sub) return res.status(404).json({ error: 'Suscripción no encontrada' });
+
+        const [user, product] = await Promise.all([
+            prisma.user.findUnique({
+                where:  { id: sub.userId },
+                select: { name: true, whatsapp: true, empresa: true },
+            }),
+            prisma.product.findUnique({
+                where:  { id: sub.productId },
+                select: { name: true, sku: true },
+            }),
+        ]);
+
+        const today     = new Date();
+        const nombre    = user?.name    ?? 'Cliente';
+        const empresa   = user?.empresa ?? 'tu empresa';
+        const modelo    = product?.sku  ?? 'tóner';
+        const impresora = sub.printerModel ?? 'tu impresora';
+        const daysUsed  = differenceInDays(today, new Date(sub.lastRefillDate));
+        const waTarget  = (user?.whatsapp ?? '').replace(/\D/g, '') || WA_ADMIN;
+
+        const message = [
+            `Hola ${nombre}, espero que la semana vaya excelente en ${empresa}. 👋`,
+            `Soy de ToneBOX. Te escribo porque según nuestros registros, tu tóner ${modelo} para la ${impresora} está llegando a su zona crítica de agotamiento.`,
+            `📊 Llevas aproximadamente ${daysUsed} días de uso y el rendimiento estimado es de ${sub.yield} páginas.`,
+            `¿Te gustaría que te enviemos el reemplazo antes de que se acabe? Tenemos el compatible ToneBOX que funciona perfecto y puedes ahorrar hasta 70% vs el original.`,
+        ].join('\n\n');
+
+        res.json({
+            waUrl:   `https://wa.me/${waTarget}?text=${encodeURIComponent(message)}`,
+            message,
+            target:  waTarget,
+        });
+
+    } catch (error) {
+        console.error('[WA Template] Error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 export default router;
