@@ -31,6 +31,20 @@ model User {
   estado         String?
   origenUTM      String?
 
+  // Envío
+  shippingStreet   String?
+  shippingColonia  String?
+  shippingCity     String?
+  shippingState    String?
+  shippingZip      String?
+
+  // Facturación
+  requiresInvoice  Boolean @default(false)
+  rfc              String?
+  razonSocial      String?
+  regimenFiscal    String?
+  usoCFDI          String?
+
   // Relations
   workspaces     WorkspaceMember[]
   ownedWorkspaces Workspace[] @relation("WorkspaceOwner")
@@ -456,6 +470,34 @@ model DemandCaptureLead {
   @@index([status])
   @@map("demand_capture_leads")
 }
+// Pedidos del catálogo público — checkout 3 pasos
+model CatalogOrder {
+  id              String   @id @default(cuid())
+  folio           String   @unique
+  userId          String?
+  clientName      String?
+  clientPhone     String?
+  items           Json     @default("[]")
+  subtotal        Float    @default(0)
+  speiTotal       Float    @default(0)
+  shippingStreet  String?
+  shippingColonia String?
+  shippingCity    String?
+  shippingState   String?
+  shippingZip     String?
+  requiresInvoice Boolean  @default(false)
+  rfc             String?
+  razonSocial     String?
+  regimenFiscal   String?
+  usoCFDI         String?
+  status          String   @default("PENDING_PAYMENT_VALIDATION")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status])
+  @@map("catalog_orders")
+}
+
 // Dispatch type for providers and rules
 enum DispatchType {
   DIRECT

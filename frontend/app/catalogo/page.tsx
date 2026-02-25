@@ -5,10 +5,11 @@ import Link from 'next/link';
 import {
   Search, MessageCircle, Package, Printer, X,
   Loader2, Tag, Menu, ChevronRight, Plus, Minus,
-  ShoppingCart, Trash2, Droplets, Layers, ScrollText, LayoutGrid,
+  ShoppingCart, Droplets, Layers, ScrollText, LayoutGrid,
 } from 'lucide-react';
 import ToneBoxLogo from '@/components/shared/ToneBoxLogo';
 import Footer from '@/components/shared/Footer';
+import { CheckoutDrawer } from '@/components/catalogo/CheckoutDrawer';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const INK    = '#0B0E14';
@@ -258,139 +259,7 @@ function ProductCard({ p, cartQty, onAdd, onRemove }: {
   );
 }
 
-// ── Cart Drawer ───────────────────────────────────────────────────────────────
-function CartDrawer({ cart, onClose, onUpdate, onRemoveItem, onClear }: {
-  cart: CartItem[]; onClose: () => void;
-  onUpdate: (id: string, qty: number) => void;
-  onRemoveItem: (id: string) => void; onClear: () => void;
-}) {
-  const total = cart.reduce((s, i) => s + (i.product.publicPrice ?? 0) * i.qty, 0);
-
-  const waMsg = encodeURIComponent(
-    'Hola Iván, quiero cotizar los siguientes productos:\n\n' +
-    cart.map((i, idx) => `${idx + 1}. ${i.qty}x ${i.product.name} — $${fmt((i.product.publicPrice ?? 0) * i.qty)}`).join('\n') +
-    `\n\n💰 Total estimado: $${fmt(total)}\n¿Tienen disponibilidad?\n\n_Enviado desde tonebox.mx/catalogo_`
-  );
-
-  return (
-    <>
-      <div className="fixed inset-0 z-[200]"
-        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
-        onClick={onClose} />
-      <div className="fixed right-0 top-0 bottom-0 z-[201] flex flex-col"
-        style={{ width: 'min(400px,100vw)', background: INK2, borderLeft: `1px solid ${BORDER}` }}>
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4"
-          style={{ borderBottom: `1px solid ${BORDER}` }}>
-          <div className="flex items-center gap-2">
-            <ShoppingCart className="w-4 h-4" style={{ color: GREEN }} />
-            <span className="font-black text-base">Tu Cotización</span>
-            {cart.length > 0 && (
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full"
-                style={{ background: 'rgba(0,200,150,0.12)', color: GREEN }}>
-                {cart.reduce((s, i) => s + i.qty, 0)} items
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {cart.length > 0 && (
-              <button onClick={onClear}
-                className="text-[11px] font-semibold transition-colors hover:text-white"
-                style={{ color: MUTED }}>Limpiar</button>
-            )}
-            <button onClick={onClose}
-              className="p-1.5 rounded-lg transition-colors hover:bg-white/5"
-              style={{ color: MUTED }}>
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Items */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-          {cart.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-3 text-center py-16">
-              <ShoppingCart className="w-10 h-10" style={{ color: 'rgba(255,255,255,0.1)' }} />
-              <p className="font-bold text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                Tu carrito está vacío
-              </p>
-              <p className="text-xs" style={{ color: MUTED }}>Agrega productos para cotizar</p>
-            </div>
-          ) : (
-            cart.map(item => (
-              <div key={item.product.id} className="flex gap-3 p-3 rounded-xl"
-                style={{ background: CARD, border: `1px solid ${BORDER}` }}>
-                <div className="w-12 h-12 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center"
-                  style={{ background: 'rgba(255,255,255,0.04)' }}>
-                  {item.product.image
-                    ? <img src={item.product.image} alt={item.product.name} className="w-full h-full object-contain p-1" />
-                    : <span className="text-[9px] font-black font-mono" style={{ color: GREEN }}>TB</span>
-                  }
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold line-clamp-2 leading-snug"
-                    style={{ color: 'rgba(255,255,255,0.85)' }}>{item.product.name}</p>
-                  {item.product.publicPrice && (
-                    <p className="text-xs font-mono mt-0.5" style={{ color: GREEN }}>
-                      ${fmt((item.product.publicPrice) * item.qty)}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <div className="flex items-center rounded-lg overflow-hidden"
-                      style={{ border: `1px solid ${BORDER}` }}>
-                      <button onClick={() => onUpdate(item.product.id, item.qty - 1)}
-                        className="px-2 py-1 transition-colors hover:bg-white/5"
-                        style={{ color: MUTED }}>
-                        <Minus className="w-3 h-3" />
-                      </button>
-                      <span className="px-2 text-xs font-black" style={{ color: 'white' }}>{item.qty}</span>
-                      <button onClick={() => onUpdate(item.product.id, item.qty + 1)}
-                        className="px-2 py-1 transition-colors hover:bg-white/5"
-                        style={{ color: MUTED }}>
-                        <Plus className="w-3 h-3" />
-                      </button>
-                    </div>
-                    <button onClick={() => onRemoveItem(item.product.id)}
-                      className="p-1 transition-colors hover:text-red-400"
-                      style={{ color: MUTED }}>
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Footer */}
-        {cart.length > 0 && (
-          <div className="px-5 py-4 space-y-3" style={{ borderTop: `1px solid ${BORDER}` }}>
-            <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: MUTED }}>Total estimado</span>
-              <span className="text-xl font-black" style={{ color: 'white' }}>${fmt(total)}</span>
-            </div>
-            <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.18)' }}>
-              * Precios y disponibilidad sujetos a confirmación con proveedor
-            </p>
-            <a
-              href={`https://wa.me/528441628536?text=${waMsg}`}
-              target="_blank" rel="noopener noreferrer"
-              onClick={onClose}
-              className="flex items-center justify-center gap-2.5 w-full py-3.5 rounded-2xl font-black text-sm transition-all"
-              style={{ background: WA, color: '#fff' }}
-              onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.opacity = '0.9'}
-              onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.opacity = '1'}
-            >
-              <MessageCircle className="w-4 h-4" />
-              Finalizar Pedido por WhatsApp
-            </a>
-          </div>
-        )}
-      </div>
-    </>
-  );
-}
+// CartDrawer reemplazado por CheckoutDrawer (importado arriba)
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function CatalogoPage() {
@@ -479,9 +348,9 @@ export default function CatalogoPage() {
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: INK, color: 'white' }}>
 
-      {/* ── Cart Drawer ── */}
+      {/* ── Checkout Drawer (3 pasos: carrito → envío/factura → SPEI) ── */}
       {cartOpen && (
-        <CartDrawer
+        <CheckoutDrawer
           cart={cart} onClose={() => setCartOpen(false)}
           onUpdate={updateCartQty} onRemoveItem={removeCartItem}
           onClear={() => setCart([])}
