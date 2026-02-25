@@ -82,9 +82,10 @@ export default function CriticalAlertsPage() {
     }
   }, []);
 
+  // Fetch on mount — el endpoint no requiere auth, el redirect de arriba protege la vista
   useEffect(() => {
-    if (isAuthenticated) fetchAlerts();
-  }, [isAuthenticated, fetchAlerts]);
+    if (!authLoading) fetchAlerts();
+  }, [authLoading, fetchAlerts]);
 
   const handleWA = (alert: CriticalUser) => {
     setOpeningWa(alert.subscriptionId);
