@@ -309,6 +309,11 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
   const [searched, setSearched]             = useState(false);
   const [showAll, setShowAll]               = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  // Keeps current query accessible inside effects without adding it to deps
+  const queryRef       = useRef(query);
+  useEffect(() => { queryRef.current = query; });
+  // Skip firing the brand/category effect on initial mount
+  const didMount = useRef(false);
 
   useEffect(() => {
     fetch('/api/products/brands')
@@ -344,10 +349,16 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
     }
   }, []);
 
+  // Reactive search: fires whenever brand or category filter changes.
+  // Uses queryRef so the current search term is always included without
+  // adding `query` to deps (which would fire on every keystroke).
+  useEffect(() => {
+    if (!didMount.current) { didMount.current = true; return; }
+    doSearch(activeBrand, queryRef.current, activeCategory);
+  }, [activeBrand, activeCategory, doSearch]);
+
   function handleBrand(brand: string) {
-    const next = activeBrand === brand ? null : brand;
-    setActiveBrand(next);
-    doSearch(next, query, activeCategory);
+    setActiveBrand(prev => prev === brand ? null : brand);
   }
 
   function handleSearch(e: React.FormEvent) {
@@ -365,9 +376,7 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
       document.getElementById('bundles-widget')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
-    const next = activeCategory === id ? null : id;
-    setActiveCategory(next);
-    doSearch(activeBrand, query, next);
+    setActiveCategory(prev => prev === id ? null : id);
   }
 
   const cleanProducts = products.filter(p => !NOISE_CATEGORIES.has(p.category ?? ''));
@@ -516,7 +525,13 @@ export default function ProductComparatorSection({ onSelectProduct }: Props) {
               Intenta con el número de parte (ej: TN-660) o el modelo de impresora.
             </p>
             <a
-              href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(`Hola ToneBOX, busco el consumible: "${query || 'modelo no especificado'}". ¿Lo tienen disponible?`)}`}
+              href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(
+                `Hola ToneBOX, busco ${
+                  activeBrand
+                    ? `tóner ${BRAND_CONFIG[activeBrand]?.label ?? activeBrand.toUpperCase()}`
+                    : 'un consumible'
+                }${query.trim() ? `, modelo: "${query.trim()}"` : ''}. ¿Lo tienen disponible?`
+              )}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 mt-6 px-6 py-3 rounded-2xl text-sm font-black transition-all hover:-translate-y-0.5"
