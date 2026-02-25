@@ -267,9 +267,9 @@ function CartDrawer({ cart, onClose, onUpdate, onRemoveItem, onClear }: {
   const total = cart.reduce((s, i) => s + (i.product.publicPrice ?? 0) * i.qty, 0);
 
   const waMsg = encodeURIComponent(
-    'Hola Iván, quiero cotizar los siguientes productos:\n' +
-    cart.map(i => `${i.qty}x ${i.product.name} ($${fmt((i.product.publicPrice ?? 0) * i.qty)})`).join('\n') +
-    `\nTotal estimado: $${fmt(total)}. ¿Tienen disponibilidad?`
+    'Hola Iván, quiero cotizar los siguientes productos:\n\n' +
+    cart.map((i, idx) => `${idx + 1}. ${i.qty}x ${i.product.name} — $${fmt((i.product.publicPrice ?? 0) * i.qty)}`).join('\n') +
+    `\n\n💰 Total estimado: $${fmt(total)}\n¿Tienen disponibilidad?\n\n_Enviado desde tonebox.mx/catalogo_`
   );
 
   return (
