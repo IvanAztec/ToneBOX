@@ -11,8 +11,11 @@ import { asyncHandler, HttpErrors } from '../middleware/errorHandler.js';
 import { authenticate } from '../middleware/auth.js';
 import { config } from '../config/index.js';
 
-const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+// pdf-parse se carga de forma lazy para evitar crash en startup (lee archivos de test al importar)
+const _require = createRequire(import.meta.url);
+function getPdfParse() {
+  return _require('pdf-parse/lib/pdf-parse.js');
+}
 
 // Multer: memory storage for PDF uploads
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -238,6 +241,7 @@ router.post('/csf/upload', upload.single('csf'), asyncHandler(async (req, res) =
   // Extract fiscal data from PDF text
   let extracted = { rfc: '', razonSocial: '', regimenFiscal: '', codigoPostal: '' };
   try {
+    const pdfParse = getPdfParse();
     const pdfData = await pdfParse(req.file.buffer);
     extracted = extractFiscalData(pdfData.text);
   } catch (err) {
