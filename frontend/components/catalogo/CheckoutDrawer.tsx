@@ -6,6 +6,8 @@ import {
   MapPin, FileText, ChevronRight, ChevronLeft, Loader2,
   CheckCircle2, Copy, Building2,
 } from 'lucide-react';
+import { FiscalUpload } from '@/features/billing/FiscalUpload';
+import type { FiscalData } from '@/features/billing/types';
 
 const INK    = '#0B0E14';
 const INK2   = '#161B26';
@@ -36,6 +38,7 @@ interface Form {
   street: string; colonia: string; city: string; state: string; zip: string;
   requiresInvoice: boolean;
   rfc: string; razonSocial: string; regimenFiscal: string; usoCFDI: string;
+  csfUrl: string;
 }
 
 const REGS = [
@@ -172,8 +175,9 @@ function CartStep({ cart, onUpdate, onRemoveItem, onClear, onNext, onClose }: {
 }
 
 // ── Step 1: Envío + Facturación ────────────────────────────────────────────────
-function DataStep({ form, onChange, user, saveToProfile, onSaveToggle, onBack, onNext, loading }: {
+function DataStep({ form, onChange, onCsfExtracted, user, saveToProfile, onSaveToggle, onBack, onNext, loading }: {
   form: Form; onChange: (f: Partial<Form>) => void;
+  onCsfExtracted: (data: Partial<FiscalData>, url: string | null) => void;
   user: UserProfile | null; saveToProfile: boolean; onSaveToggle: () => void;
   onBack: () => void; onNext: () => void; loading: boolean;
 }) {
@@ -232,6 +236,7 @@ function DataStep({ form, onChange, user, saveToProfile, onSaveToggle, onBack, o
           {form.requiresInvoice && (
             <div className="space-y-3 p-3 rounded-xl" style={{ background: 'rgba(255,180,0,0.04)', border: '1px solid rgba(255,180,0,0.15)' }}>
               <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: AMBER }}>Datos Fiscales</p>
+              <FiscalUpload onExtracted={onCsfExtracted} />
               <Field label="RFC" value={form.rfc} onChange={v => onChange({ rfc: v })} placeholder="XAXX010101000" />
               <Field label="Razón Social" value={form.razonSocial} onChange={v => onChange({ razonSocial: v })} placeholder="Mi Empresa S.A. de C.V." />
               <SelectField label="Régimen Fiscal" value={form.regimenFiscal} onChange={v => onChange({ regimenFiscal: v })} options={REGS} />
@@ -281,7 +286,8 @@ function SpeiStep({ cart, form, folio, onBack, onClose, onClear }: {
     cart.map((i, idx) => `${idx + 1}. ${i.qty}x ${i.product.name} — $${fmt((i.product.speiPrice ?? 0) * i.qty)}`).join('\n') +
     `\n\n💰 Total SPEI transferido: $${fmt(speiTotal)} MXN` +
     (form.requiresInvoice
-      ? `\n\n🧾 Facturación: Solicitada\n   RFC: ${form.rfc}\n   Razón Social: ${form.razonSocial}\n   Régimen: ${form.regimenFiscal}\n   Uso CFDI: ${form.usoCFDI}`
+      ? `\n\n🧾 Facturación: Solicitada\n   RFC: ${form.rfc}\n   Razón Social: ${form.razonSocial}\n   Régimen: ${form.regimenFiscal}\n   Uso CFDI: ${form.usoCFDI}` +
+        (form.csfUrl ? `\n   📎 CSF: ${form.csfUrl}` : '')
       : `\n\n🧾 Facturación: No solicitada`) +
     (addrLine ? `\n\n🚚 Dirección de entrega:\n   ${addrLine}` : '') +
     `\n\n📎 Adjunto comprobante a continuación.\n\n_Enviado desde tonebox.mx/catalogo_`
@@ -371,10 +377,19 @@ export function CheckoutDrawer({ cart, onClose, onUpdate, onRemoveItem, onClear 
   const [folio, setFolio]        = useState('');
   const [form, setForm]          = useState<Form>({
     name: '', phone: '', street: '', colonia: '', city: '', state: '', zip: '',
-    requiresInvoice: false, rfc: '', razonSocial: '', regimenFiscal: '', usoCFDI: '',
+    requiresInvoice: false, rfc: '', razonSocial: '', regimenFiscal: '', usoCFDI: '', csfUrl: '',
   });
 
   const patch = (partial: Partial<Form>) => setForm(prev => ({ ...prev, ...partial }));
+
+  const handleCsfExtracted = (data: Partial<FiscalData>, url: string | null) => {
+    patch({
+      rfc:          data.rfc           || form.rfc,
+      razonSocial:  data.razonSocial   || form.razonSocial,
+      regimenFiscal: data.regimenFiscal || form.regimenFiscal,
+      csfUrl:       url ?? form.csfUrl,
+    });
+  };
 
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
@@ -432,7 +447,7 @@ export function CheckoutDrawer({ cart, onClose, onUpdate, onRemoveItem, onClear 
           subtotal:   cart.reduce((s, i) => s + (i.product.publicPrice ?? 0) * i.qty, 0),
           speiTotal:  cart.reduce((s, i) => s + (i.product.speiPrice ?? 0) * i.qty, 0),
           shipping:   { street: form.street, colonia: form.colonia, city: form.city, state: form.state, zip: form.zip },
-          billing:    { requiresInvoice: form.requiresInvoice, rfc: form.rfc, razonSocial: form.razonSocial, regimenFiscal: form.regimenFiscal, usoCFDI: form.usoCFDI },
+          billing:    { requiresInvoice: form.requiresInvoice, rfc: form.rfc, razonSocial: form.razonSocial, regimenFiscal: form.regimenFiscal, usoCFDI: form.usoCFDI, csfUrl: form.csfUrl || null },
           clientInfo: { name: form.name, phone: form.phone, userId: user?.id },
         }),
       });
@@ -455,7 +470,7 @@ export function CheckoutDrawer({ cart, onClose, onUpdate, onRemoveItem, onClear 
       <div className="fixed right-0 top-0 bottom-0 z-[201] flex flex-col"
         style={{ width: 'min(420px,100vw)', background: INK2, borderLeft: `1px solid ${BORDER}` }}>
         {step === 0 && <CartStep cart={cart} onUpdate={onUpdate} onRemoveItem={onRemoveItem} onClear={onClear} onNext={() => setStep(1)} onClose={onClose} />}
-        {step === 1 && <DataStep form={form} onChange={patch} user={user} saveToProfile={saveToProfile} onSaveToggle={() => setSave(p => !p)} onBack={() => setStep(0)} onNext={goToSpei} loading={creating} />}
+        {step === 1 && <DataStep form={form} onChange={patch} onCsfExtracted={handleCsfExtracted} user={user} saveToProfile={saveToProfile} onSaveToggle={() => setSave(p => !p)} onBack={() => setStep(0)} onNext={goToSpei} loading={creating} />}
         {step === 2 && <SpeiStep cart={cart} form={form} folio={folio} onBack={() => setStep(1)} onClose={onClose} onClear={onClear} />}
       </div>
     </>

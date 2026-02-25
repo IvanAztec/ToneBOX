@@ -1,12 +1,40 @@
 /**
- * Billing Routes (Stripe Integration)
+ * Billing Routes (Stripe Integration + CSF Extraction)
  */
 
 import { Router } from 'express';
+import { createRequire } from 'module';
+import multer from 'multer';
+import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 import { asyncHandler, HttpErrors } from '../middleware/errorHandler.js';
 import { authenticate } from '../middleware/auth.js';
 import { config } from '../config/index.js';
+
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
+
+// Multer: memory storage for PDF uploads
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+// Supabase admin client — optional; graceful fallback if env vars not set
+const supabaseAdmin = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+  : null;
+
+// SAT CSF text extraction — handles several layout variations
+function extractFiscalData(text) {
+  const rfcMatch      = text.match(/RFC\s*:?\s*([A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3})/i);
+  const nameMatch     = text.match(/(?:Denominaci[oó]n\s*[/\\]?\s*Raz[oó]n\s*Social|Raz[oó]n\s*Social)\s*:?\s*([^\n\r]+)/i);
+  const regimenMatch  = text.match(/R[eé]gimen(?:\s*Fiscal)?\s*:?\s*([^\n\r]+)/i);
+  const cpMatch       = text.match(/(?:C[oó]digo\s*Postal|C\.P\.)\s*:?\s*(\d{5})/i);
+  return {
+    rfc:          rfcMatch?.[1]?.trim()      ?? '',
+    razonSocial:  nameMatch?.[1]?.trim()     ?? '',
+    regimenFiscal: regimenMatch?.[1]?.trim() ?? '',
+    codigoPostal: cpMatch?.[1]?.trim()       ?? '',
+  };
+}
 
 const router = Router();
 
@@ -196,6 +224,52 @@ router.get('/plans', asyncHandler(async (req, res) => {
     success: true,
     data: plans,
   });
+}));
+
+// ── POST /billing/csf/upload ──────────────────────────────────────────────────
+// Recibe un PDF de Constancia de Situación Fiscal (SAT), extrae datos fiscales
+// y lo sube a Supabase Storage. Auth opcional — funciona en checkout público.
+router.post('/csf/upload', upload.single('csf'), asyncHandler(async (req, res) => {
+  if (!req.file) throw HttpErrors.badRequest('Archivo CSF requerido');
+  if (req.file.mimetype !== 'application/pdf' && !req.file.originalname?.toLowerCase().endsWith('.pdf')) {
+    throw HttpErrors.badRequest('Solo se aceptan archivos PDF');
+  }
+
+  // Extract fiscal data from PDF text
+  let extracted = { rfc: '', razonSocial: '', regimenFiscal: '', codigoPostal: '' };
+  try {
+    const pdfData = await pdfParse(req.file.buffer);
+    extracted = extractFiscalData(pdfData.text);
+  } catch (err) {
+    console.warn('[CSF] PDF parse warning:', err.message);
+    // Graceful — return empty data so user fills manually
+  }
+
+  // Upload to Supabase Storage (optional — only if SUPABASE_SERVICE_ROLE_KEY is set)
+  let publicUrl = null;
+  if (supabaseAdmin) {
+    try {
+      const userId   = req.user?.id ?? 'anon';
+      const filename = `${userId}/${Date.now()}_csf.pdf`;
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from('constancias_fiscales')
+        .upload(filename, req.file.buffer, { contentType: 'application/pdf', upsert: true });
+
+      if (!uploadError) {
+        const { data: urlData } = supabaseAdmin.storage
+          .from('constancias_fiscales')
+          .getPublicUrl(filename);
+        publicUrl = urlData?.publicUrl ?? null;
+      } else {
+        console.warn('[CSF] Storage upload failed:', uploadError.message);
+      }
+    } catch (err) {
+      console.warn('[CSF] Storage error:', err.message);
+    }
+  }
+
+  console.log(`[CSF] ✅ RFC:${extracted.rfc || '—'} | url:${publicUrl ? 'stored' : 'none'}`);
+  res.json({ success: true, data: extracted, url: publicUrl });
 }));
 
 export default router;

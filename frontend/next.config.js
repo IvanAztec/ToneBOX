@@ -10,6 +10,7 @@ const nextConfig = {
       'ctonline.mx',
       'connect.ctonline.mx',
       'images.ctonline.mx',
+      'xlfbdxyzlfzjqykznnob.supabase.co',
     ],
   },
   async rewrites() {
