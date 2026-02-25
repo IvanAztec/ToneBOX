@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   User, Building2, Phone, Mail, ArrowLeft, Pencil,
-  Save, X, Send, CheckCircle2, AlertTriangle, Loader2, Bot, Megaphone,
+  Save, X, Send, CheckCircle2, AlertTriangle, Loader2, Bot, Megaphone, FileText,
 } from 'lucide-react';
 
 interface Template { name: string; subtitle: string; emoji: string; template: string; }
@@ -24,6 +24,29 @@ interface ProfileForm {
   cargo: string;
   whatsapp: string;
 }
+
+interface FiscalForm {
+  requiresInvoice: boolean;
+  rfc: string;
+  razonSocial: string;
+  regimenFiscal: string;
+  usoCFDI: string;
+}
+
+const REGS = [
+  '601 — General de Ley Personas Morales',
+  '612 — Personas Físicas con Actividades Empresariales',
+  '621 — Incorporación Fiscal',
+  '626 — Régimen Simplificado de Confianza (RESICO)',
+  '625 — Plataformas Tecnológicas',
+];
+const CFDIS = [
+  'G01 — Adquisición de mercancías',
+  'G03 — Gastos en general',
+  'I01 — Construcciones',
+  'D01 — Honorarios médicos y gastos hospitalarios',
+  'S01 — Sin efectos fiscales',
+];
 
 // ── Campo de solo lectura ─────────────────────────────────────────────────────
 function ReadField({ icon, label, value }: { icon: React.ReactNode; label: string; value?: string | null }) {
@@ -146,6 +169,50 @@ export default function SettingsPage() {
     }
     setEditing(false);
     setSaveResult(null);
+  };
+
+  // ── Datos Fiscales ─────────────────────────────────────────────────────────
+  const [editingFiscal, setEditingFiscal]     = useState(false);
+  const [savingFiscal, setSavingFiscal]       = useState(false);
+  const [fiscalResult, setFiscalResult]       = useState<{ ok: boolean; msg: string } | null>(null);
+  const [fiscalForm, setFiscalForm]           = useState<FiscalForm>({
+    requiresInvoice: false, rfc: '', razonSocial: '', regimenFiscal: '', usoCFDI: '',
+  });
+
+  useEffect(() => {
+    if (user) {
+      setFiscalForm({
+        requiresInvoice: (user as any).requiresInvoice ?? false,
+        rfc:             (user as any).rfc             ?? '',
+        razonSocial:     (user as any).razonSocial     ?? '',
+        regimenFiscal:   (user as any).regimenFiscal   ?? '',
+        usoCFDI:         (user as any).usoCFDI         ?? '',
+      });
+    }
+  }, [user]);
+
+  const handleFiscalSave = async () => {
+    setSavingFiscal(true);
+    setFiscalResult(null);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch('/api/auth/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(fiscalForm),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setFiscalResult({ ok: true, msg: '✅ Datos fiscales guardados.' });
+        setEditingFiscal(false);
+      } else {
+        setFiscalResult({ ok: false, msg: `❌ ${data.error ?? 'Error al guardar'}` });
+      }
+    } catch {
+      setFiscalResult({ ok: false, msg: '❌ No se pudo conectar al backend.' });
+    } finally {
+      setSavingFiscal(false);
+    }
   };
 
   // ── Templates de Marketing ────────────────────────────────────────────────
@@ -335,6 +402,97 @@ export default function SettingsPage() {
           {saveResult && (
             <div className={`mx-5 mb-4 rounded-lg border p-3 text-sm font-medium ${saveResult.ok ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
               {saveResult.msg}
+            </div>
+          )}
+        </div>
+
+        {/* ── Datos Fiscales ── */}
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-amber-500" />
+              <h2 className="font-bold text-gray-800">Datos Fiscales</h2>
+            </div>
+            {!editingFiscal ? (
+              <button onClick={() => { setEditingFiscal(true); setFiscalResult(null); }}
+                className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-all">
+                <Pencil className="w-3.5 h-3.5" />Editar
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button onClick={() => { setEditingFiscal(false); setFiscalResult(null); }}
+                  className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-all">
+                  <X className="w-3.5 h-3.5" />Cancelar
+                </button>
+                <button onClick={handleFiscalSave} disabled={savingFiscal}
+                  className="flex items-center gap-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg transition-all disabled:opacity-50">
+                  {savingFiscal ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  {savingFiscal ? 'Guardando...' : 'Guardar'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="px-5 py-4 space-y-4">
+            {/* Toggle ¿Requiere Factura? */}
+            <div className="flex items-center justify-between py-2 border-b border-gray-50">
+              <div>
+                <p className="text-sm font-semibold text-gray-800">¿Requiere Factura?</p>
+                <p className="text-xs text-gray-400">Se pre-carga automáticamente en el checkout</p>
+              </div>
+              {editingFiscal ? (
+                <button onClick={() => setFiscalForm(p => ({ ...p, requiresInvoice: !p.requiresInvoice }))}
+                  className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200"
+                  style={{ background: fiscalForm.requiresInvoice ? '#00C896' : '#E5E7EB' }}>
+                  <span className="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200"
+                    style={{ transform: fiscalForm.requiresInvoice ? 'translateX(22px)' : 'translateX(4px)' }} />
+                </button>
+              ) : (
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${fiscalForm.requiresInvoice ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
+                  {fiscalForm.requiresInvoice ? '✓ Sí' : 'No'}
+                </span>
+              )}
+            </div>
+
+            {/* Campos fiscales */}
+            {(['rfc', 'razonSocial'] as const).map(field => (
+              <div key={field} className="flex items-start gap-3 py-2 border-b border-gray-50">
+                <FileText className="w-4 h-4 text-gray-400 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-xs text-gray-400 font-medium">{field === 'rfc' ? 'RFC' : 'Razón Social'}</p>
+                  {editingFiscal ? (
+                    <input value={fiscalForm[field]} onChange={e => setFiscalForm(p => ({ ...p, [field]: e.target.value }))}
+                      placeholder={field === 'rfc' ? 'XAXX010101000' : 'Mi Empresa S.A. de C.V.'}
+                      className="mt-0.5 w-full text-sm text-gray-900 font-semibold border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  ) : (
+                    <p className="text-sm text-gray-800 font-semibold mt-0.5">{fiscalForm[field] || <span className="text-gray-300 font-normal">No configurado</span>}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {(['regimenFiscal', 'usoCFDI'] as const).map(field => (
+              <div key={field} className="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
+                <FileText className="w-4 h-4 text-gray-400 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-xs text-gray-400 font-medium">{field === 'regimenFiscal' ? 'Régimen Fiscal' : 'Uso CFDI'}</p>
+                  {editingFiscal ? (
+                    <select value={fiscalForm[field]} onChange={e => setFiscalForm(p => ({ ...p, [field]: e.target.value }))}
+                      className="mt-0.5 w-full text-sm text-gray-900 font-semibold border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                      <option value="">Seleccionar...</option>
+                      {(field === 'regimenFiscal' ? REGS : CFDIS).map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  ) : (
+                    <p className="text-sm text-gray-800 font-semibold mt-0.5">{fiscalForm[field] || <span className="text-gray-300 font-normal">No configurado</span>}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {fiscalResult && (
+            <div className={`mx-5 mb-4 rounded-lg border p-3 text-sm font-medium ${fiscalResult.ok ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+              {fiscalResult.msg}
             </div>
           )}
         </div>
