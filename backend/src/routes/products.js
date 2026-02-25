@@ -71,7 +71,7 @@ router.get('/', async (req, res) => {
             select: {
                 id: true, sku: true, name: true, brand: true, category: true,
                 publicPrice: true, speiPrice: true, productType: true, providerSku: true,
-                compatibility: true, image: true, availabilityStatus: true,
+                compatibility: true, image: true, availabilityStatus: true, yield: true,
                 updatedAt: true,
                 provider: { select: { name: true, code: true } },
             },
@@ -194,25 +194,45 @@ router.get('/search', async (req, res) => {
             select: {
                 id: true, sku: true, name: true, brand: true, category: true,
                 publicPrice: true, speiPrice: true, productType: true, providerSku: true,
-                compatibility: true, image: true, availabilityStatus: true,
+                compatibility: true, image: true, availabilityStatus: true, yield: true,
                 provider: { select: { name: true, code: true } },
             },
             take: 60,
             orderBy: { publicPrice: 'asc' },
         });
 
-        // ── Tier classification ───────────────────────────────────────────────
+        // ── Relevance + Waterfall sort ────────────────────────────────────────
+        // Prioridad 1: Match exacto de SKU (boost +1000/+500/+200)
+        // Prioridad 2: Compatible BOP (ToneBOX) → CADTONER → Compatible genérico → Original
+        const WATERFALL = { 'BOP': 100, 'BOP-MX': 100, 'CADTONER': 80 };
         const AHORRO_PROVIDERS = new Set(['BOP', 'BOP-MX', 'CADTONER']);
+
+        function computeRelevance(p, rawQ) {
+            let score = 0;
+            if (rawQ) {
+                const qNorm    = rawQ.toLowerCase().replace(/-/g, '').trim();
+                const skuNorm  = p.sku.toLowerCase().replace(/-/g, '');
+                const pskuNorm = (p.providerSku ?? '').toLowerCase().replace(/-/g, '');
+                if      (skuNorm === qNorm    || pskuNorm === qNorm)                      score += 1000;
+                else if (skuNorm.startsWith(qNorm) || pskuNorm.startsWith(qNorm))         score += 500;
+                else if (skuNorm.includes(qNorm)   || pskuNorm.includes(qNorm))           score += 200;
+            }
+            const code = p.provider?.code ?? '';
+            if (p.productType === 'COMPATIBLE') score += WATERFALL[code] ?? 60;
+            return score;
+        }
+
         const products = rawProducts
             .map(p => ({
                 ...p,
-                tier: AHORRO_PROVIDERS.has(p.provider?.code) ? 'AHORRO_VIP' : 'PREMIUM',
+                tier:       AHORRO_PROVIDERS.has(p.provider?.code) ? 'AHORRO_VIP' : 'PREMIUM',
+                _relevance: computeRelevance(p, q),
             }))
-            .sort((a, b) => {
-                if (a.tier === 'AHORRO_VIP' && b.tier !== 'AHORRO_VIP') return -1;
-                if (a.tier !== 'AHORRO_VIP' && b.tier === 'AHORRO_VIP') return 1;
-                return 0;
-            });
+            .sort((a, b) =>
+                b._relevance - a._relevance ||
+                (a.publicPrice ?? 0) - (b.publicPrice ?? 0)
+            )
+            .map(({ _relevance, ...p }) => p); // strip internal field
 
         const count = products.length;
 
