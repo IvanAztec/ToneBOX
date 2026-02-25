@@ -24,7 +24,7 @@ const navigation: NavItem[] = [
   { name: 'Zona Crítica',       href: '/admin/critical',       icon: AlertTriangle, adminOnly: true },
   { name: 'Campañas de Cierre', href: '/admin/campanas',       icon: Megaphone,     adminOnly: true },
   { name: 'Mis Pedidos',        href: '/dashboard/billing',    icon: CreditCard },
-  { name: 'Equipo',             href: '/dashboard/teams',      icon: Users },
+  { name: 'CRM Clientes',       href: '/dashboard/teams',      icon: Users, adminOnly: true },
   { name: 'Mi Empresa',         href: '/dashboard/workspaces', icon: Building2 },
   { name: 'Configuración',      href: '/dashboard/settings',   icon: Settings },
 ];

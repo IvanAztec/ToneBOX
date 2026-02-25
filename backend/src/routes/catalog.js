@@ -72,6 +72,7 @@ router.post('/order', async (req, res) => {
                 razonSocial:    billing?.razonSocial    || null,
                 regimenFiscal:  billing?.regimenFiscal  || null,
                 usoCFDI:        billing?.usoCFDI        || null,
+                csfUrl:         billing?.csfUrl         || null,
                 status:         'PENDING_PAYMENT_VALIDATION',
             },
         });

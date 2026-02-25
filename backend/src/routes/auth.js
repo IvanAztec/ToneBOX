@@ -198,7 +198,7 @@ router.get('/me', authenticate, asyncHandler(async (req, res) => {
 // Actualiza campos de perfil: name, empresa, cargo, whatsapp
 router.patch('/me', authenticate, asyncHandler(async (req, res) => {
   const allowed = [
-    'name', 'empresa', 'cargo', 'whatsapp',
+    'name', 'empresa', 'cargo', 'whatsapp', 'businessType',
     'shippingStreet', 'shippingColonia', 'shippingCity', 'shippingState', 'shippingZip',
     'requiresInvoice', 'rfc', 'razonSocial', 'regimenFiscal', 'usoCFDI',
   ];

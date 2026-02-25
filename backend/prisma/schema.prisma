@@ -30,6 +30,7 @@ model User {
   ciudad         String?
   estado         String?
   origenUTM      String?
+  businessType   String   @default("POR_CLASIFICAR") // INSTITUCION | PYME | DESPACHO | CORPORATIVO | REVENDEDOR | POR_CLASIFICAR
 
   // Envío
   shippingStreet   String?
@@ -490,6 +491,7 @@ model CatalogOrder {
   razonSocial     String?
   regimenFiscal   String?
   usoCFDI         String?
+  csfUrl          String?
   status          String   @default("PENDING_PAYMENT_VALIDATION")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
