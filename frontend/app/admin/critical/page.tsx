@@ -147,7 +147,8 @@ export default function CriticalAlertsPage() {
         )}
 
         {/* Table — 5 cols, Acción sticky right para siempre visible */}
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        {/* overflow-hidden removido del outer para que sticky funcione correctamente */}
+        <div className="bg-white rounded-xl border border-gray-100">
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[640px]">
               <thead>

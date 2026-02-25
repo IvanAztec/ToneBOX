@@ -194,6 +194,30 @@ router.get('/me', authenticate, asyncHandler(async (req, res) => {
   res.json({ success: true, data: userWithoutPassword });
 }));
 
+// ── PATCH /auth/me ────────────────────────────────────────────────────────────
+// Actualiza campos de perfil: name, empresa, cargo, whatsapp
+router.patch('/me', authenticate, asyncHandler(async (req, res) => {
+  const allowed = ['name', 'empresa', 'cargo', 'whatsapp'];
+  const data = {};
+  for (const field of allowed) {
+    if (req.body[field] !== undefined) {
+      data[field] = req.body[field]?.trim() || null;
+    }
+  }
+
+  if (Object.keys(data).length === 0) {
+    throw HttpErrors.badRequest('No hay campos válidos para actualizar');
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: req.user.id },
+    data,
+  });
+
+  const { password: _, ...userWithoutPassword } = updated;
+  res.json({ success: true, data: userWithoutPassword });
+}));
+
 // ── POST /auth/refresh ────────────────────────────────────────────────────────
 router.post('/refresh', asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
