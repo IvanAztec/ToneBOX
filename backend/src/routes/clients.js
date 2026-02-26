@@ -97,6 +97,19 @@ router.get('/', asyncHandler(async (req, res) => {
   res.json({ success: true, total: data.length, data });
 }));
 
+// ── GET /api/admin/clients/alerts ────────────────────────────────────────────
+router.get('/alerts', asyncHandler(async (req, res) => {
+  const { computeReplenishmentAlerts } = await import('../jobs/replenishmentAlertJob.js');
+  const alerts = await computeReplenishmentAlerts();
+  const summary = {
+    critical: alerts.filter(a => a.level === 'CRITICAL').length,
+    high:     alerts.filter(a => a.level === 'HIGH').length,
+    medium:   alerts.filter(a => a.level === 'MEDIUM').length,
+    total:    alerts.length,
+  };
+  res.json({ success: true, summary, data: alerts });
+}));
+
 // ── GET /api/admin/clients/export ─────────────────────────────────────────────
 router.get('/export', asyncHandler(async (req, res) => {
   const XLSX = _require('xlsx');

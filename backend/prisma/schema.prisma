@@ -515,6 +515,44 @@ model CompanySettings {
   @@map("company_settings")
 }
 
+// Registro de auditoría de pagos — SPEI y Stripe
+model PaymentLog {
+  id              String    @id @default(cuid())
+  // Orden relacionada
+  catalogOrderId  String?   // CatalogOrder (checkout 3-pasos)
+  orderId         String?   // Order (PaymentGateway combos)
+  folio           String?
+  // Cliente
+  clientName      String?
+  clientEmail     String?
+  // Pago
+  method          String    // SPEI | STRIPE | CASH
+  amount          Float
+  currency        String    @default("MXN")
+  status          String    @default("PENDING") // PENDING | COMPLETED | FAILED | MANUAL
+  // SPEI
+  claveRastreo    String?
+  // CEP Banxico
+  cepData         Json?     // JSON completo de Banxico CEP
+  cepBancoEmisor  String?   // Banco emisor
+  cepRfcOrdenante String?   // RFC del ordenante
+  cepHoraCert     DateTime? // Hora de certificación
+  cepEstado       String?   // LIQUIDADA | DEVUELTA
+  // Auditoría
+  validatedBy     String?   // "BANXICO_AUTO" | "ADMIN_MANUAL"
+  validatedAt     DateTime?
+  notes           String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([method, status])
+  @@index([catalogOrderId])
+  @@index([orderId])
+  @@index([createdAt])
+  @@map("payment_logs")
+}
+
 // Dispatch type for providers and rules
 enum DispatchType {
   DIRECT

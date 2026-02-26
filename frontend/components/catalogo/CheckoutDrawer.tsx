@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import {
   X, ShoppingCart, Minus, Plus, Trash2, MessageCircle,
   MapPin, FileText, ChevronRight, ChevronLeft, Loader2,
-  CheckCircle2, Copy, Building2,
+  CheckCircle2, Copy, Building2, UserPlus,
 } from 'lucide-react';
 import { FiscalUpload } from '@/features/billing/FiscalUpload';
 import type { FiscalData } from '@/features/billing/types';
@@ -67,10 +67,65 @@ function Field({ label, value, onChange, placeholder }: {
     <div className="space-y-1">
       <label className="block text-[11px] font-bold" style={{ color: MUTED }}>{label}</label>
       <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        className="w-full px-3 py-2.5 rounded-xl text-sm outline-none transition-all"
-        style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${BORDER}`, color: 'white' }}
-        onFocus={e => (e.currentTarget as HTMLInputElement).style.borderColor = 'rgba(0,200,150,0.4)'}
+        className="w-full px-3 py-2.5 rounded-xl text-sm outline-none transition-all bg-white text-slate-900 placeholder:text-gray-400"
+        style={{ border: `1.5px solid ${BORDER}` }}
+        onFocus={e => (e.currentTarget as HTMLInputElement).style.borderColor = 'rgba(0,200,150,0.6)'}
         onBlur={e => (e.currentTarget as HTMLInputElement).style.borderColor = BORDER} />
+    </div>
+  );
+}
+
+// ── Modal: Registro Rápido (si no hay sesión) ───────────────────────────────
+function QuickRegisterModal({ onContinue, onSkip }: {
+  onContinue: (name: string, phone: string) => void;
+  onSkip: () => void;
+}) {
+  const [name,  setName]  = useState('');
+  const [phone, setPhone] = useState('');
+  const valid = name.trim().length >= 2 && phone.trim().length >= 8;
+
+  return (
+    <div className="fixed inset-0 z-[210] flex items-end sm:items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}>
+      <div className="w-full max-w-sm mx-4 mb-4 sm:mb-0 rounded-2xl p-6 space-y-5"
+        style={{ background: INK2, border: `1px solid ${BORDER}` }}>
+
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(0,200,150,0.12)' }}>
+            <UserPlus className="w-5 h-5" style={{ color: GREEN }} />
+          </div>
+          <div>
+            <p className="font-black text-sm" style={{ color: 'white' }}>Registro Rápido</p>
+            <p className="text-xs mt-0.5" style={{ color: MUTED }}>
+              Dejanos tu nombre y WhatsApp para procesar tu pedido y mantenerte actualizado.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <Field label="Tu nombre" value={name} onChange={setName} placeholder="Nombre completo" />
+          <Field label="WhatsApp" value={phone} onChange={setPhone} placeholder="844 162 8536" />
+        </div>
+
+        <div className="flex gap-2">
+          <button onClick={onSkip}
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all"
+            style={{ border: `1px solid ${BORDER}`, color: MUTED }}>
+            Continuar sin registrar
+          </button>
+          <button onClick={() => valid && onContinue(name.trim(), phone.trim())}
+            disabled={!valid}
+            className="flex-1 py-2.5 rounded-xl text-xs font-black transition-all disabled:opacity-40"
+            style={{ background: GREEN, color: INK }}>
+            Continuar al pedido
+          </button>
+        </div>
+
+        <p className="text-[10px] text-center" style={{ color: 'rgba(255,255,255,0.2)' }}>
+          Solo para confirmar tu pedido — sin spam, sin contraseña
+        </p>
+      </div>
     </div>
   );
 }
@@ -375,12 +430,13 @@ export function CheckoutDrawer({ cart, onClose, onUpdate, onRemoveItem, onClear 
   onUpdate: (id: string, qty: number) => void;
   onRemoveItem: (id: string) => void; onClear: () => void;
 }) {
-  const [step, setStep]          = useState(0);
-  const [user, setUser]          = useState<UserProfile | null>(null);
-  const [company, setCompany]    = useState(COMPANY_DEFAULTS);
-  const [saveToProfile, setSave] = useState(true);
-  const [creating, setCreating]  = useState(false);
-  const [folio, setFolio]        = useState('');
+  const [step, setStep]               = useState(0);
+  const [showRegisterModal, setShowRM] = useState(false);
+  const [user, setUser]               = useState<UserProfile | null>(null);
+  const [company, setCompany]         = useState(COMPANY_DEFAULTS);
+  const [saveToProfile, setSave]      = useState(true);
+  const [creating, setCreating]       = useState(false);
+  const [folio, setFolio]             = useState('');
   const [form, setForm]          = useState<Form>({
     name: '', phone: '', street: '', colonia: '', city: '', state: '', zip: '',
     requiresInvoice: false, rfc: '', razonSocial: '', regimenFiscal: '', usoCFDI: '', csfUrl: '',
@@ -475,6 +531,20 @@ export function CheckoutDrawer({ cart, onClose, onUpdate, onRemoveItem, onClear 
     }
   };
 
+  const handleCartNext = () => {
+    if (!user) {
+      setShowRM(true);
+    } else {
+      setStep(1);
+    }
+  };
+
+  const handleRegisterContinue = (capturedName: string, capturedPhone: string) => {
+    patch({ name: capturedName || form.name, phone: capturedPhone || form.phone });
+    setShowRM(false);
+    setStep(1);
+  };
+
   return (
     <>
       <div className="fixed inset-0 z-[200]"
@@ -482,10 +552,16 @@ export function CheckoutDrawer({ cart, onClose, onUpdate, onRemoveItem, onClear 
         onClick={onClose} />
       <div className="fixed right-0 top-0 bottom-0 z-[201] flex flex-col"
         style={{ width: 'min(420px,100vw)', background: INK2, borderLeft: `1px solid ${BORDER}` }}>
-        {step === 0 && <CartStep cart={cart} onUpdate={onUpdate} onRemoveItem={onRemoveItem} onClear={onClear} onNext={() => setStep(1)} onClose={onClose} />}
+        {step === 0 && <CartStep cart={cart} onUpdate={onUpdate} onRemoveItem={onRemoveItem} onClear={onClear} onNext={handleCartNext} onClose={onClose} />}
         {step === 1 && <DataStep form={form} onChange={patch} onCsfExtracted={handleCsfExtracted} user={user} saveToProfile={saveToProfile} onSaveToggle={() => setSave(p => !p)} onBack={() => setStep(0)} onNext={goToSpei} loading={creating} />}
         {step === 2 && <SpeiStep cart={cart} form={form} folio={folio} company={company} onBack={() => setStep(1)} onClose={onClose} onClear={onClear} />}
       </div>
+      {showRegisterModal && (
+        <QuickRegisterModal
+          onContinue={handleRegisterContinue}
+          onSkip={() => { setShowRM(false); setStep(1); }}
+        />
+      )}
     </>
   );
 }

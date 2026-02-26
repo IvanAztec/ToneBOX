@@ -429,4 +429,119 @@ router.post('/telegram/test', async (_req, res) => {
     }
 });
 
+// ── GET /api/admin/ingresos ───────────────────────────────────────────────────
+// Registro de Ingresos: CatalogOrders + PaymentLogs + datos CEP
+router.get('/ingresos', async (req, res) => {
+    try {
+        const { from, to, method, status, page = '1' } = req.query;
+        const pageNum = Math.max(1, parseInt(page, 10));
+        const take    = 60;
+        const skip    = (pageNum - 1) * take;
+
+        // Construir filtro de fechas para CatalogOrders
+        const dateFilter = {};
+        if (from) dateFilter.gte = new Date(from);
+        if (to)   dateFilter.lte = new Date(new Date(to).getTime() + 86400000);
+
+        const orderWhere = {};
+        if (Object.keys(dateFilter).length) orderWhere.createdAt = dateFilter;
+        if (status) orderWhere.status = status;
+
+        // CatalogOrders (checkout 3-pasos)
+        const catalogOrders = await prisma.catalogOrder.findMany({
+            where: orderWhere,
+            orderBy: { createdAt: 'desc' },
+            take,
+            skip,
+        });
+
+        // Obtener PaymentLogs relacionados a estas órdenes
+        const catalogOrderIds = catalogOrders.map(o => o.id);
+        const paymentLogs = await prisma.paymentLog.findMany({
+            where: {
+                OR: [
+                    { catalogOrderId: { in: catalogOrderIds } },
+                    { claveRastreo:   { not: null } },
+                ],
+            },
+        });
+        const logMap = new Map();
+        for (const l of paymentLogs) {
+            if (l.catalogOrderId) logMap.set(l.catalogOrderId, l);
+        }
+
+        const data = catalogOrders.map(order => ({
+            ...order,
+            paymentLog: logMap.get(order.id) ?? null,
+        }));
+
+        // Estadísticas rápidas
+        const stats = await prisma.catalogOrder.groupBy({
+            by: ['status'],
+            _count: { id: true },
+            _sum:   { speiTotal: true },
+        });
+
+        res.json({ success: true, total: catalogOrders.length, data, stats });
+    } catch (err) {
+        console.error('[admin/ingresos]', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ── GET /api/admin/ingresos/:id/receipt ──────────────────────────────────────
+// Genera el JSON del recibo interno con datos CEP para descarga
+router.get('/ingresos/:id/receipt', async (req, res) => {
+    try {
+        const order = await prisma.catalogOrder.findUnique({ where: { id: req.params.id } });
+        if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
+
+        const paymentLog = await prisma.paymentLog.findFirst({
+            where: { catalogOrderId: order.id },
+        });
+
+        const receipt = {
+            folio:       order.folio,
+            fecha:       order.createdAt,
+            cliente:     order.clientName,
+            telefono:    order.clientPhone,
+            items:       order.items,
+            subtotal:    order.subtotal,
+            total:       order.speiTotal,
+            metodo:      'SPEI — Transferencia Bancaria',
+            estado:      order.status,
+            // Datos Banxico CEP
+            cep: paymentLog?.cepData ? {
+                bancoEmisor:      paymentLog.cepBancoEmisor,
+                rfcOrdenante:     paymentLog.cepRfcOrdenante,
+                horaCertificacion: paymentLog.cepHoraCert,
+                estado:           paymentLog.cepEstado,
+                claveRastreo:     paymentLog.claveRastreo,
+                validadoEn:       paymentLog.validatedAt,
+                validadoPor:      paymentLog.validatedBy,
+            } : null,
+            // Facturación
+            facturacion: order.requiresInvoice ? {
+                rfc:          order.rfc,
+                razonSocial:  order.razonSocial,
+                regimenFiscal: order.regimenFiscal,
+                usoCFDI:      order.usoCFDI,
+            } : null,
+            // Empresa ToneBOX
+            emisor: {
+                nombre:  'ToneBOX México S.A. de C.V.',
+                web:     'tonebox.mx',
+                telefono: '844 162 8536',
+                correo:  'hola@tonebox.mx',
+            },
+            generadoEn: new Date().toISOString(),
+        };
+
+        res.json({ success: true, receipt });
+    } catch (err) {
+        console.error('[receipt]', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 export default router;

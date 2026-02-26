@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     CreditCard, Landmark, CheckCircle2, ShieldCheck, Zap,
     Upload, Copy, ExternalLink, Loader2, Check, AlertCircle, FileText,
@@ -15,10 +15,10 @@ interface PaymentGatewayProps {
     comboType?: string;
 }
 
-const BANK_INFO = {
-    clabe: '012180004567890123',
-    clabeFormatted: '0121 8000 4567 8901 23',
-    bank: 'BBVA Bancomer',
+// Datos bancarios default (se sobreescriben con /api/company-settings)
+const BANK_DEFAULTS = {
+    clabe:       '012180004567890123',
+    bank:        'BBVA Bancomer',
     beneficiary: 'ToneBOX México S.A. de C.V.',
 };
 
@@ -38,15 +38,34 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
     const [copiedClabe, setCopiedClabe]     = useState(false);
     const [copiedFolio, setCopiedFolio]     = useState(false);
     const [loading, setLoading]             = useState(false);
+    const [loadingFolio, setLoadingFolio]   = useState(false);
     const [result, setResult]               = useState<{ folio: string; paymentId: string } | null>(null);
+    const [preFolio, setPreFolio]           = useState<string | null>(null);
+    const [preOrderId, setPreOrderId]       = useState<string | null>(null);
     const [deliveryMethod, setDeliveryMethod] = useState<'envio' | 'sucursal'>('envio');
     const [contactName, setContactName]     = useState('');
     const [contactWA, setContactWA]         = useState('');
+    const [bankInfo, setBankInfo]           = useState(BANK_DEFAULTS);
     const fileRef = useRef<HTMLInputElement>(null);
 
     const hasHardware = comboType === 'BUSINESS_START';
 
-    // SPEI elimina el 1.04 de comisión operativa: speiPrice = publicPrice / 1.04
+    // Cargar datos bancarios desde CompanySettings
+    useEffect(() => {
+        fetch('/api/company-settings')
+            .then(r => r.json())
+            .then(d => {
+                if (d.success && d.data) {
+                    setBankInfo({
+                        clabe:       d.data.clabeNumber  || BANK_DEFAULTS.clabe,
+                        bank:        d.data.bankName     || BANK_DEFAULTS.bank,
+                        beneficiary: d.data.beneficiario || BANK_DEFAULTS.beneficiary,
+                    });
+                }
+            })
+            .catch(() => {});
+    }, []);
+
     const speiPrice      = parseFloat((basePrice / 1.04).toFixed(2));
     const discountAmount = method === 'spei' ? parseFloat((basePrice - speiPrice).toFixed(2)) : 0;
     const finalPrice     = method === 'spei' ? speiPrice : basePrice;
@@ -66,32 +85,59 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
         if (file) setUploadedFile(file);
     };
 
+    // Al seleccionar SPEI: genera el folio real inmediatamente
+    const handleSelectSpei = async () => {
+        setMethod('spei');
+        setSpeiStep('info');
+        if (preFolio) return; // ya tenemos folio
+
+        setLoadingFolio(true);
+        try {
+            const res = await fetch('/api/payments/pre-folio', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ productName, amount: speiPrice, userId }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                setPreFolio(data.folio);
+                setPreOrderId(data.orderId);
+            }
+        } catch {
+            // Folio fallback con timestamp
+            setPreFolio(`TB-${Date.now().toString().slice(-4)}`);
+        } finally {
+            setLoadingFolio(false);
+        }
+    };
+
     const handleSpeiConfirm = async () => {
         setLoading(true);
         try {
             const formData = new FormData();
             formData.append('productName', productName);
             formData.append('amount', finalPrice.toString());
-            if (contactName) formData.append('clientName', contactName);
-            if (contactWA)   formData.append('clientContact', contactWA);
-            if (userId)      formData.append('userId', userId);
-            if (trackingKey) formData.append('trackingKey', trackingKey);
+            if (contactName)  formData.append('clientName',    contactName);
+            if (contactWA)    formData.append('clientContact', contactWA);
+            if (userId)       formData.append('userId',        userId);
+            if (trackingKey)  formData.append('trackingKey',   trackingKey);
+            if (preOrderId)   formData.append('existingOrderId', preOrderId);
             if (uploadedFile) formData.append('receipt', uploadedFile);
 
-            const res = await fetch('/api/payments/spei/confirm', { method: 'POST', body: formData });
+            const res  = await fetch('/api/payments/spei/confirm', { method: 'POST', body: formData });
             const data = await res.json();
             if (data.success) {
                 setResult({ folio: data.folio, paymentId: data.paymentId });
                 setSpeiStep('confirmed');
             }
         } catch {
-            setSpeiStep('confirmed'); // No bloquear al cliente si hay error de red
+            setResult({ folio: preFolio || 'TB-####', paymentId: '' });
+            setSpeiStep('confirmed');
         } finally {
             setLoading(false);
         }
     };
 
-    // ── Estado vacío: ningún bundle seleccionado ──────────────────────────────
     if (basePrice === 0) {
         return (
             <div className="bg-white rounded-[2rem] shadow-2xl shadow-gray-200/60 border border-gray-100 p-8 flex flex-col items-center justify-center text-center min-h-[380px]">
@@ -129,7 +175,6 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
                     </span>
                 </div>
 
-                {/* ── Banner ON_DEMAND ── */}
                 {availabilityStatus === 'ON_DEMAND' && (
                     <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4">
                         <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
@@ -167,7 +212,6 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
 
             <div className="p-8">
 
-                {/* ── A. Delivery Method Selector (solo cuando hasHardware) ── */}
                 {hasHardware && (
                     <div className="mb-6">
                         <label className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3 block">
@@ -175,8 +219,8 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
                         </label>
                         <div className="grid grid-cols-2 gap-3">
                             <button
-                                onClick={() => { setDeliveryMethod('envio'); }}
-                                className={`flex flex-col items-center justify-center gap-1.5 p-4 rounded-2xl border-2 transition-all text-sm font-bold ${deliveryMethod === 'envio' ? 'border-gray-900 bg-gray-50 text-gray-900' : 'border-gray-100 text-gray-500 hover:border-gray-200'}`}
+                                onClick={() => setDeliveryMethod('envio')}
+                                className={`flex flex-col items-center justify-center gap-1.5 p-4 rounded-2xl border-2 transition-all text-sm font-bold ${deliveryMethod === 'envio' ? 'border-emerald-500 bg-emerald-50 text-gray-900' : 'border-gray-100 text-gray-500 hover:border-gray-200'}`}
                             >
                                 <span className="text-xl">🚚</span>
                                 <span>Envío a Domicilio</span>
@@ -184,7 +228,7 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
                             </button>
                             <button
                                 onClick={() => { setDeliveryMethod('sucursal'); setMethod('card'); }}
-                                className={`flex flex-col items-center justify-center gap-1.5 p-4 rounded-2xl border-2 transition-all text-sm font-bold ${deliveryMethod === 'sucursal' ? 'border-gray-900 bg-gray-50 text-gray-900' : 'border-gray-100 text-gray-500 hover:border-gray-200'}`}
+                                className={`flex flex-col items-center justify-center gap-1.5 p-4 rounded-2xl border-2 transition-all text-sm font-bold ${deliveryMethod === 'sucursal' ? 'border-emerald-500 bg-emerald-50 text-gray-900' : 'border-gray-100 text-gray-500 hover:border-gray-200'}`}
                             >
                                 <span className="text-xl">🏢</span>
                                 <span>Recoger en Sucursal</span>
@@ -204,7 +248,7 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
                     </div>
                 )}
 
-                {/* ── B. Contact Form (siempre visible) ── */}
+                {/* ── B. Contact Form ── */}
                 <div className="mb-6">
                     <label className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3 block">
                         Tus Datos de Contacto
@@ -215,20 +259,19 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
                             placeholder="Nombre o Empresa"
                             value={contactName}
                             onChange={e => setContactName(e.target.value)}
-                            className="w-full border-2 border-gray-100 bg-gray-50 rounded-xl px-4 py-3 text-sm outline-none focus:border-gray-300 transition-colors"
+                            className="w-full border-2 border-gray-200 bg-white rounded-xl px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-500 transition-colors placeholder:text-gray-400"
                         />
                         <input
                             type="tel"
                             placeholder="📱 WhatsApp (para confirmar tu pedido)"
                             value={contactWA}
                             onChange={e => setContactWA(e.target.value)}
-                            className="w-full border-2 border-gray-100 bg-gray-50 rounded-xl px-4 py-3 text-sm outline-none focus:border-gray-300 transition-colors"
+                            className="w-full border-2 border-gray-200 bg-white rounded-xl px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-500 transition-colors placeholder:text-gray-400"
                         />
                     </div>
                     <p className="text-[11px] text-gray-400 mt-2 text-center">Sin contraseña · Sin registro · Solo WhatsApp</p>
                 </div>
 
-                {/* ── C. Smart WA Button (sucursal) OR normal payment flow (envio) ── */}
                 {deliveryMethod === 'sucursal' ? (
                     <a
                         href={`https://wa.me/${WA_NUMBER}?text=${waPickupMsg}`}
@@ -241,7 +284,6 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
                     </a>
                 ) : (
                     <>
-                        {/* ── Selector de Método (solo en pasos info) ── */}
                         {speiStep !== 'confirmed' && (
                             <>
                                 <label className="text-xs font-black uppercase tracking-widest text-gray-400 mb-4 block">
@@ -249,10 +291,16 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
                                 </label>
                                 <div className="grid gap-3 mb-8">
                                     {/* Tarjeta */}
-                                    <button onClick={() => { setMethod('card'); setSpeiStep('info'); }}
-                                        className={`flex items-center justify-between p-5 rounded-2xl border-2 transition-all ${method === 'card' ? 'border-gray-900 bg-gray-50' : 'border-gray-100 hover:border-gray-200'}`}>
+                                    <button
+                                        onClick={() => { setMethod('card'); setSpeiStep('info'); }}
+                                        className={`flex items-center justify-between p-5 rounded-2xl border-2 transition-all ${
+                                            method === 'card'
+                                                ? 'border-emerald-500 bg-emerald-50/50'
+                                                : 'border-gray-100 hover:border-gray-200'
+                                        }`}
+                                    >
                                         <div className="flex items-center gap-4">
-                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${method === 'card' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${method === 'card' ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
                                                 <CreditCard className="w-6 h-6" />
                                             </div>
                                             <div className="text-left">
@@ -260,37 +308,55 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
                                                 <p className="text-xs text-gray-500">Pago Estándar — procesado por Stripe</p>
                                             </div>
                                         </div>
-                                        {method === 'card' && <CheckCircle2 className="w-6 h-6 text-gray-900" />}
+                                        {method === 'card' && (
+                                            <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center">
+                                                <Check className="w-3.5 h-3.5 text-white" />
+                                            </div>
+                                        )}
                                     </button>
 
                                     {/* SPEI */}
-                                    <button onClick={() => setMethod('spei')}
-                                        className={`flex items-center justify-between p-5 rounded-2xl border-2 transition-all relative ${method === 'spei' ? 'border-green-600 bg-green-50/30' : 'border-gray-100 hover:border-green-200'}`}>
+                                    <button
+                                        onClick={handleSelectSpei}
+                                        className={`flex items-center justify-between p-5 rounded-2xl border-2 transition-all relative ${
+                                            method === 'spei'
+                                                ? 'border-emerald-500 bg-emerald-50/30'
+                                                : 'border-gray-100 hover:border-emerald-200'
+                                        }`}
+                                    >
                                         <div className="flex items-center gap-4">
-                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${method === 'spei' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${method === 'spei' ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
                                                 <Landmark className="w-6 h-6" />
                                             </div>
                                             <div className="text-left">
                                                 <p className="font-bold text-gray-900">Transferencia SPEI</p>
-                                                <p className="text-xs text-green-600 font-black">Ahorra un 4% adicional — ${(basePrice - basePrice / 1.04).toFixed(2)} MXN menos</p>
+                                                <p className="text-xs text-emerald-600 font-black">
+                                                    Ahorra un 4% adicional — ${(basePrice - basePrice / 1.04).toFixed(2)} MXN menos
+                                                </p>
                                             </div>
                                         </div>
-                                        {method === 'spei'
-                                            ? <CheckCircle2 className="w-6 h-6 text-green-600" />
-                                            : <span className="text-[10px] font-black bg-green-100 text-green-700 px-2 py-1 rounded absolute top-2 right-2">RECOMENDADO VIP</span>}
+                                        {method === 'spei' ? (
+                                            <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center">
+                                                <Check className="w-3.5 h-3.5 text-white" />
+                                            </div>
+                                        ) : (
+                                            <span className="text-[10px] font-black bg-green-100 text-green-700 px-2 py-1 rounded absolute top-2 right-2">
+                                                RECOMENDADO VIP
+                                            </span>
+                                        )}
                                     </button>
                                 </div>
                             </>
                         )}
 
-                        {/* ── TARJETA: Botón Stripe ── */}
+                        {/* Tarjeta: Botón Stripe */}
                         {method === 'card' && (
                             <button className="w-full bg-gray-900 text-white py-4 rounded-2xl text-sm font-black hover:bg-gray-800 transition-all active:scale-95">
                                 Proceder al Pago Seguro →
                             </button>
                         )}
 
-                        {/* ── SPEI: Datos bancarios ── */}
+                        {/* SPEI: Datos bancarios + Folio real */}
                         {method === 'spei' && speiStep === 'info' && (
                             <div className="p-6 bg-gray-900 rounded-2xl text-white space-y-5 animate-in zoom-in-95 duration-300">
                                 <div className="flex items-center gap-2">
@@ -298,22 +364,48 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
                                     <p className="text-sm font-bold">Beneficio VIP Activado</p>
                                 </div>
 
+                                {/* Folio real generado inmediatamente */}
+                                {(preFolio || loadingFolio) && (
+                                    <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-1">
+                                            Tu Folio de Pago — Usa este en el Concepto
+                                        </p>
+                                        {loadingFolio ? (
+                                            <div className="flex items-center gap-2">
+                                                <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                                                <span className="text-sm text-gray-400">Generando folio...</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-2xl font-black tracking-tight text-white">{preFolio}</span>
+                                                <button
+                                                    onClick={() => handleCopy(preFolio!, 'folio')}
+                                                    className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 transition-colors px-3 py-1.5 rounded-lg text-xs font-bold"
+                                                >
+                                                    {copiedFolio ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                                    Copiar
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
                                 {/* Datos bancarios */}
                                 <div className="bg-white/5 rounded-xl p-4 space-y-3 text-xs">
                                     <div className="flex justify-between">
                                         <span className="text-gray-500">Banco</span>
-                                        <span className="font-bold">{BANK_INFO.bank}</span>
+                                        <span className="font-bold">{bankInfo.bank}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-gray-500">Beneficiario</span>
-                                        <span className="font-bold">{BANK_INFO.beneficiary}</span>
+                                        <span className="font-bold">{bankInfo.beneficiary}</span>
                                     </div>
                                     <div className="flex justify-between items-center border-t border-white/10 pt-3">
                                         <span className="text-gray-500">CLABE</span>
                                         <div className="flex items-center gap-2">
-                                            <span className="font-mono text-green-400">{BANK_INFO.clabeFormatted}</span>
-                                            <button onClick={() => handleCopy(BANK_INFO.clabe, 'clabe')} className="text-gray-400 hover:text-white transition-colors p-1">
-                                                {copiedClabe ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+                                            <span className="font-mono text-emerald-400">{bankInfo.clabe}</span>
+                                            <button onClick={() => handleCopy(bankInfo.clabe, 'clabe')} className="text-gray-400 hover:text-white transition-colors p-1">
+                                                {copiedClabe ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                                             </button>
                                         </div>
                                     </div>
@@ -323,7 +415,6 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
                                     </div>
                                 </div>
 
-                                {/* ── LEYENDA OBLIGATORIA ── */}
                                 <div className="flex items-start gap-2 bg-yellow-400/10 border border-yellow-400/40 rounded-xl p-4">
                                     <AlertCircle className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />
                                     <p className="text-xs text-yellow-200 leading-relaxed">
@@ -334,24 +425,20 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
                                 </div>
 
                                 <button onClick={() => setSpeiStep('upload')}
-                                    className="w-full bg-green-500 text-black py-3.5 rounded-xl text-sm font-black flex items-center justify-center gap-2 hover:bg-green-400 transition-all active:scale-95">
+                                    className="w-full bg-emerald-500 text-black py-3.5 rounded-xl text-sm font-black flex items-center justify-center gap-2 hover:bg-emerald-400 transition-all active:scale-95">
                                     <Upload className="w-4 h-4" /> Ya Transferí — Subir Comprobante
                                 </button>
                                 <p className="text-[10px] text-gray-500 text-center">Tu pedido se despachará en cuanto validemos la transferencia.</p>
                             </div>
                         )}
 
-                        {/* ── SPEI: Subir comprobante + Folio prominente ── */}
+                        {/* SPEI: Subir comprobante */}
                         {method === 'spei' && speiStep === 'upload' && (
                             <div className="space-y-4 animate-in slide-in-from-bottom-2 duration-300">
-
-                                {/* ── Folio de pago — EL ELEMENTO CLAVE ── */}
                                 <div className="bg-gray-900 rounded-2xl p-5 space-y-4">
                                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">
                                         Concepto de Pago Obligatorio
                                     </p>
-
-                                    {/* Leyenda obligatoria */}
                                     <div className="flex items-start gap-2 bg-yellow-400/10 border border-yellow-400/30 rounded-xl p-3">
                                         <AlertCircle className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />
                                         <p className="text-xs text-yellow-200 leading-relaxed">
@@ -359,35 +446,29 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
                                             de tu orden en el concepto de tu transferencia.
                                         </p>
                                     </div>
-
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <p className="text-gray-400 text-[11px] mb-1">Tu folio se asigna al confirmar abajo</p>
-                                            <p className="text-white font-black text-3xl tracking-tight"
-                                                style={{ fontFeatureSettings: '"tnum"' }}>
-                                                TB-####
-                                            </p>
-                                            <p className="text-gray-400 text-[11px] mt-1">
-                                                Copia el folio y agrégalo en el concepto de tu SPEI.
+                                            <p className="text-gray-400 text-[11px] mb-1">Tu folio de pago</p>
+                                            <p className="text-white font-black text-3xl tracking-tight">
+                                                {preFolio || 'TB-####'}
                                             </p>
                                         </div>
                                         <button
-                                            onClick={() => handleCopy('TB-####', 'folio')}
+                                            onClick={() => handleCopy(preFolio || 'TB-####', 'folio')}
                                             className="flex flex-col items-center gap-1.5 bg-white/10 hover:bg-white/20 transition-colors p-3 rounded-xl">
-                                            {copiedFolio ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5 text-white" />}
+                                            {copiedFolio ? <Check className="w-5 h-5 text-emerald-400" /> : <Copy className="w-5 h-5 text-white" />}
                                             <span className="text-[9px] text-gray-400 font-bold">COPIAR</span>
                                         </button>
                                     </div>
                                 </div>
 
-                                {/* Upload */}
                                 <button type="button" onClick={() => fileRef.current?.click()}
-                                    className={`w-full border-2 border-dashed rounded-2xl p-6 transition-all text-center ${uploadedFile ? 'border-green-400 bg-green-50' : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'}`}>
+                                    className={`w-full border-2 border-dashed rounded-2xl p-6 transition-all text-center ${uploadedFile ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'}`}>
                                     <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={handleFileChange} />
                                     {uploadedFile ? (
-                                        <div className="flex items-center justify-center gap-2 text-green-700">
+                                        <div className="flex items-center justify-center gap-2 text-emerald-700">
                                             <FileText className="w-5 h-5" />
-                                            <p className="text-sm font-bold">{uploadedFile.name}</p>
+                                            <p className="text-sm font-bold text-slate-900">{uploadedFile.name}</p>
                                         </div>
                                     ) : (
                                         <>
@@ -402,9 +483,13 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
                                     <div className="relative flex justify-center text-xs"><span className="px-4 bg-white text-gray-400 font-bold">o pega tu clave de rastreo</span></div>
                                 </div>
 
-                                <input type="text" placeholder="Ej: 2024021012345678901234567890"
-                                    value={trackingKey} onChange={e => setTrackingKey(e.target.value)}
-                                    className="w-full border-2 border-gray-100 bg-gray-50 rounded-xl px-4 py-3 text-sm font-mono outline-none focus:border-gray-900 transition-colors" />
+                                <input
+                                    type="text"
+                                    placeholder="Ej: 2024021012345678901234567890"
+                                    value={trackingKey}
+                                    onChange={e => setTrackingKey(e.target.value)}
+                                    className="w-full border-2 border-gray-200 bg-white rounded-xl px-4 py-3 text-sm text-slate-900 font-mono outline-none focus:border-emerald-500 transition-colors placeholder:text-gray-400"
+                                />
 
                                 <div className="flex items-start gap-2 text-xs text-gray-400 bg-gray-50 rounded-xl p-3">
                                     <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-blue-400" />
@@ -425,7 +510,7 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
                             </div>
                         )}
 
-                        {/* ── Pantalla de confirmación con Folio real ── */}
+                        {/* Confirmación */}
                         {speiStep === 'confirmed' && (
                             <div className="text-center py-4 animate-in zoom-in-95 duration-300">
                                 <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -436,13 +521,14 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
                                     Tu asesor ToneBOX validará la transferencia y confirmará el despacho. Recibirás notificación por WhatsApp.
                                 </p>
 
-                                {/* Folio prominente en confirmación */}
-                                {result?.folio && (
+                                {(result?.folio || preFolio) && (
                                     <div className="bg-gray-50 rounded-2xl p-5 text-left space-y-3 mb-4">
                                         <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Tu Folio de Seguimiento</p>
                                         <div className="flex items-center justify-between">
-                                            <span className="font-black text-gray-900 text-3xl tracking-tight">{result.folio}</span>
-                                            <button onClick={() => handleCopy(result.folio, 'folio')}
+                                            <span className="font-black text-gray-900 text-3xl tracking-tight">
+                                                {result?.folio || preFolio}
+                                            </span>
+                                            <button onClick={() => handleCopy(result?.folio || preFolio || '', 'folio')}
                                                 className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-gray-900 transition-colors bg-white border border-gray-200 px-3 py-2 rounded-xl">
                                                 {copiedFolio ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
                                                 {copiedFolio ? 'Copiado' : 'Copiar'}

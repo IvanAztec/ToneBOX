@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Users, Download, RefreshCw, ExternalLink, FileText,
-  ChevronUp, ChevronDown,
+  ChevronUp, ChevronDown, Bell, MessageCircle, AlertTriangle,
 } from 'lucide-react';
 import DashboardLayout from '@/components/layouts/DashboardLayout';
 import { useAuth } from '@/app/providers';
@@ -42,6 +42,35 @@ interface Client {
 
 type SortKey = 'ltv' | 'lastPurchase' | 'createdAt' | 'orderCount';
 type SortDir = 'asc' | 'desc';
+
+type AlertLevel = 'CRITICAL' | 'HIGH' | 'MEDIUM';
+
+interface ReplenishmentAlert {
+  userId: string;
+  name: string | null;
+  empresa: string | null;
+  whatsapp: string | null;
+  email: string;
+  businessType: BusinessType;
+  lastPurchase: string;
+  days: number;
+  level: AlertLevel;
+  orderCount: number;
+  ltv: number;
+}
+
+interface AlertSummary {
+  critical: number;
+  high: number;
+  medium: number;
+  total: number;
+}
+
+const ALERT_CONFIG: Record<AlertLevel, { label: string; color: string; bg: string; border: string; icon: string }> = {
+  CRITICAL: { label: 'Crítico +60d',  color: '#f87171', bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.2)', icon: '🔴' },
+  HIGH:     { label: 'Urgente 45-59d',color: '#FB923C', bg: 'rgba(251,146,60,0.08)',  border: 'rgba(251,146,60,0.2)',  icon: '🟠' },
+  MEDIUM:   { label: 'En Riesgo 30-44d', color: AMBER,  bg: 'rgba(255,180,0,0.08)',   border: 'rgba(255,180,0,0.2)',  icon: '🟡' },
+};
 
 // ── Badges de Giro ─────────────────────────────────────────────────────────────
 const GIRO_CONFIG: Record<BusinessType, { label: string; color: string; bg: string }> = {
@@ -81,13 +110,18 @@ export default function CRMPage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
-  const [clients, setClients]   = useState<Client[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [filterGiro, setFilter] = useState<BusinessType | ''>('');
-  const [sortKey, setSortKey]   = useState<SortKey>('ltv');
-  const [sortDir, setSortDir]   = useState<SortDir>('desc');
-  const [patchingId, setPatch]  = useState<string | null>(null);
-  const [exporting, setExport]  = useState(false);
+  const [clients, setClients]       = useState<Client[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [filterGiro, setFilter]     = useState<BusinessType | ''>('');
+  const [sortKey, setSortKey]       = useState<SortKey>('ltv');
+  const [sortDir, setSortDir]       = useState<SortDir>('desc');
+  const [patchingId, setPatch]      = useState<string | null>(null);
+  const [exporting, setExport]      = useState(false);
+  const [alerts, setAlerts]         = useState<ReplenishmentAlert[]>([]);
+  const [alertSummary, setAlertSummary] = useState<AlertSummary | null>(null);
+  const [alertsOpen, setAlertsOpen] = useState(true);
+  const [loadingAlerts, setLoadingAlerts] = useState(true);
+  const [activeAlertLevel, setActiveAlertLevel] = useState<AlertLevel | 'ALL'>('ALL');
 
   const isAdmin = user?.role === 'admin';
 
@@ -109,6 +143,25 @@ export default function CRMPage() {
   }, [filterGiro]);
 
   useEffect(() => { fetchClients(); }, [fetchClients]);
+
+  const fetchAlerts = useCallback(async () => {
+    setLoadingAlerts(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const res   = await fetch('/api/admin/clients/alerts', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAlerts(data.data);
+        setAlertSummary(data.summary);
+      }
+    } catch { /* noop */ } finally {
+      setLoadingAlerts(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchAlerts(); }, [fetchAlerts]);
 
   const handleGiroChange = useCallback(async (clientId: string, newType: BusinessType) => {
     setPatch(clientId);
@@ -229,6 +282,168 @@ export default function CRMPage() {
             </div>
           ))}
         </div>
+
+        {/* ── Panel Alertas de Reabastecimiento ── */}
+        {(loadingAlerts || (alertSummary && alertSummary.total > 0)) && (
+          <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(248,113,113,0.05)', border: '1px solid rgba(248,113,113,0.2)' }}>
+
+            {/* Header colapsable */}
+            <button
+              className="w-full px-5 py-4 flex items-center justify-between gap-4 transition-colors hover:bg-white/[0.02]"
+              onClick={() => setAlertsOpen(p => !p)}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'rgba(248,113,113,0.15)', color: '#f87171' }}>
+                  <Bell className="w-4 h-4" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-black" style={{ color: 'white' }}>
+                    Alertas de Reabastecimiento
+                    {alertSummary && alertSummary.total > 0 && (
+                      <span className="ml-2 text-[11px] px-2 py-0.5 rounded-full font-black"
+                        style={{ background: 'rgba(248,113,113,0.2)', color: '#f87171' }}>
+                        {alertSummary.total}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: MUTED }}>Clientes sin compra en +30 días</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {alertSummary && (
+                  <div className="hidden sm:flex items-center gap-2">
+                    {alertSummary.critical > 0 && (
+                      <span className="text-[10px] font-black px-2 py-1 rounded-lg"
+                        style={{ background: 'rgba(248,113,113,0.15)', color: '#f87171' }}>
+                        🔴 {alertSummary.critical}
+                      </span>
+                    )}
+                    {alertSummary.high > 0 && (
+                      <span className="text-[10px] font-black px-2 py-1 rounded-lg"
+                        style={{ background: 'rgba(251,146,60,0.15)', color: '#FB923C' }}>
+                        🟠 {alertSummary.high}
+                      </span>
+                    )}
+                    {alertSummary.medium > 0 && (
+                      <span className="text-[10px] font-black px-2 py-1 rounded-lg"
+                        style={{ background: 'rgba(255,180,0,0.15)', color: AMBER }}>
+                        🟡 {alertSummary.medium}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {alertsOpen ? <ChevronUp className="w-4 h-4" style={{ color: MUTED }} /> : <ChevronDown className="w-4 h-4" style={{ color: MUTED }} />}
+              </div>
+            </button>
+
+            {/* Cuerpo */}
+            {alertsOpen && (
+              <div style={{ borderTop: '1px solid rgba(248,113,113,0.15)' }}>
+
+                {loadingAlerts ? (
+                  <div className="px-5 py-10 text-center">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" style={{ color: MUTED }} />
+                    <p className="text-xs" style={{ color: MUTED }}>Analizando historial de compras…</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Tabs por nivel */}
+                    <div className="px-5 py-3 flex items-center gap-2 flex-wrap" style={{ borderBottom: `1px solid ${BORDER}` }}>
+                      {(['ALL', 'CRITICAL', 'HIGH', 'MEDIUM'] as const).map(lvl => {
+                        const isActive = activeAlertLevel === lvl;
+                        const cfg = lvl !== 'ALL' ? ALERT_CONFIG[lvl] : null;
+                        const count = lvl === 'ALL' ? alerts.length : alerts.filter(a => a.level === lvl).length;
+                        if (count === 0 && lvl !== 'ALL') return null;
+                        return (
+                          <button
+                            key={lvl}
+                            onClick={() => setActiveAlertLevel(lvl)}
+                            className="text-[10px] font-black px-3 py-1.5 rounded-lg transition-all"
+                            style={{
+                              background: isActive ? (cfg?.bg ?? 'rgba(0,200,150,0.1)') : CARD,
+                              color:      isActive ? (cfg?.color ?? GREEN) : MUTED,
+                              border:     `1px solid ${isActive ? (cfg?.border ?? 'rgba(0,200,150,0.3)') : BORDER}`,
+                            }}
+                          >
+                            {lvl === 'ALL' ? `Todos (${count})` : `${cfg!.icon} ${cfg!.label} (${count})`}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Lista de clientes en alerta */}
+                    <div className="divide-y" style={{ borderColor: BORDER }}>
+                      {alerts
+                        .filter(a => activeAlertLevel === 'ALL' || a.level === activeAlertLevel)
+                        .map(a => {
+                          const cfg   = ALERT_CONFIG[a.level];
+                          const giroCfg = GIRO_CONFIG[a.businessType] ?? GIRO_CONFIG.POR_CLASIFICAR;
+                          const empresa = a.empresa || a.name || a.email;
+                          const waMsg = encodeURIComponent(
+                            `Hola${a.name ? ` ${a.name.split(' ')[0]}` : ''}! 👋 Te contactamos de ToneBox para recordarte que es momento de reabastecer tus tóners. ¿Te puedo ayudar? 😊`
+                          );
+                          const waUrl = a.whatsapp
+                            ? `https://wa.me/${a.whatsapp.replace(/\D/g, '')}?text=${waMsg}`
+                            : null;
+
+                          return (
+                            <div key={a.userId} className="px-5 py-3.5 flex items-center justify-between gap-4 transition-colors hover:bg-white/[0.02]">
+                              <div className="flex items-center gap-3 min-w-0">
+                                {/* Indicador de urgencia */}
+                                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: cfg.color }} />
+
+                                {/* Info cliente */}
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="text-sm font-semibold" style={{ color: 'white' }}>{empresa}</p>
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-black"
+                                      style={{ color: giroCfg.color, background: giroCfg.bg }}>
+                                      {giroCfg.label}
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] mt-0.5" style={{ color: MUTED }}>
+                                    Última compra: {fmtDate(a.lastPurchase)} · LTV {fmtCurrency(a.ltv)}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                {/* Badge días */}
+                                <span className="text-[10px] font-black px-2 py-1 rounded-lg whitespace-nowrap"
+                                  style={{ color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}` }}>
+                                  {a.days}d sin comprar
+                                </span>
+
+                                {/* WA */}
+                                {waUrl && (
+                                  <a href={waUrl} target="_blank" rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-[10px] font-black px-2.5 py-1.5 rounded-lg transition-all hover:opacity-80"
+                                    style={{ background: 'rgba(37,211,102,0.1)', color: '#25D366', border: '1px solid rgba(37,211,102,0.2)' }}>
+                                    <MessageCircle className="w-3 h-3" />
+                                    Reactivar
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      }
+                    </div>
+
+                    {/* Footer */}
+                    <div className="px-5 py-3 flex items-center gap-2" style={{ borderTop: `1px solid ${BORDER}` }}>
+                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: MUTED }} />
+                      <p className="text-[11px]" style={{ color: MUTED }}>
+                        Digest diario enviado a las 9:00am vía Telegram · Umbral configurable en <code className="text-[10px]">replenishmentAlertJob.js</code>
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Filtros */}
         <div className="flex items-center gap-3 flex-wrap">

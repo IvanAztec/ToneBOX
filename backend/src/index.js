@@ -24,6 +24,7 @@ import adminRoutes from './routes/admin.js';
 import companySettingsRoutes from './routes/companySettings.js';
 import clientsRoutes from './routes/clients.js';
 import { startCTSyncJob } from './jobs/ctSyncJob.js';
+import { startReplenishmentAlertJob } from './jobs/replenishmentAlertJob.js';
 
 const app = express();
 
@@ -107,6 +108,8 @@ const server = app.listen(config.port, () => {
 
   // Start CT Online automatic sync (every 4 hours)
   startCTSyncJob();
+  // Start daily replenishment alerts (09:00 MX)
+  startReplenishmentAlertJob();
 });
 
 // Graceful Shutdown

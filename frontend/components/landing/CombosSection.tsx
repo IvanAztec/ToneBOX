@@ -60,7 +60,7 @@ const DEFAULT_CONFIG = COMBO_TYPE_CONFIG.DUO_PACK;
 // Static fallback (shown when API returns 0 bundles)
 const STATIC_COMBOS = [
   {
-    name: 'TriPack Ahorro Total',
+    name: 'TriPack L2540 — Ahorro Total',
     desc: '2× TN660 Alta Cap. + 1× DR630 Drum — Serie L2540',
     price: 2890,
     comboType: 'TRIPACK',
@@ -69,7 +69,7 @@ const STATIC_COMBOS = [
     retailSaved: 860,
   },
   {
-    name: 'TriPack Ahorro Total',
+    name: 'TriPack L2350 — Ahorro Total',
     desc: '2× TN760 Alta Cap. + 1× DR730 Drum — Serie L2350',
     price: 3190,
     comboType: 'TRIPACK',
