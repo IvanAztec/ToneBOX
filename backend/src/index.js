@@ -38,14 +38,8 @@ app.use(cors({
   credentials: true,
 }));
 
-// Health Check (Antes del Limiter para Railway)
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version || '1.0.0',
-  });
-});
+// Health Check (Requerido para Railway)
+app.get('/health', (req, res) => res.status(200).send('OK'));
 
 // Rate Limiting
 const limiter = rateLimit({
