@@ -38,6 +38,15 @@ app.use(cors({
   credentials: true,
 }));
 
+// Health Check (Antes del Limiter para Railway)
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: process.env.npm_package_version || '1.0.0',
+  });
+});
+
 // Rate Limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -55,15 +64,6 @@ if (config.env !== 'test') {
   app.use(morgan('combined'));
 }
 
-// Health Check
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version || '1.0.0',
-  });
-});
-
 // API Routes
 const apiRouter = express.Router();
 
@@ -79,6 +79,9 @@ apiRouter.use('/payments', paymentRoutes);
 apiRouter.use('/admin', adminRoutes);
 apiRouter.use('/company-settings', companySettingsRoutes);
 apiRouter.use('/admin/clients', clientsRoutes);
+
+import proveedoresRoutes from './features/proveedores/proveedores.routes.js';
+apiRouter.use('/admin/proveedores', proveedoresRoutes);
 
 app.use(config.apiPrefix, apiRouter);
 
