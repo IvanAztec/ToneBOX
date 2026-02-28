@@ -35,7 +35,11 @@ app.set('trust proxy', 1);
 // Security Middleware
 app.use(helmet());
 app.use(cors({
-  origin: config.corsOrigin,
+  origin: [
+    'http://localhost:3000',
+    'https://tonebox.mx',
+    'https://tonebox.com.mx' // Agregada por seguridad adicional
+  ],
   credentials: true,
 }));
 
