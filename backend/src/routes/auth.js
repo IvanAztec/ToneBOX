@@ -151,18 +151,22 @@ router.post('/resend-verification', asyncHandler(async (req, res) => {
 router.post('/login', asyncHandler(async (req, res) => {
   const result = loginSchema.safeParse(req.body);
   if (!result.success) {
+    console.warn('[AUTH] Login validation failed:', result.error.errors);
     throw HttpErrors.badRequest('Validation failed', result.error.errors);
   }
 
   const { email, password } = result.data;
+  console.log(`[AUTH] Attempting login for: ${email}`);
 
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user || !user.password) {
+    console.warn(`[AUTH] Login failed for ${email}: User not found or no password`);
     throw HttpErrors.unauthorized('Invalid credentials');
   }
 
   const isValidPassword = await bcrypt.compare(password, user.password);
   if (!isValidPassword) {
+    console.warn(`[AUTH] Login failed for ${email}: Invalid password`);
     throw HttpErrors.unauthorized('Invalid credentials');
   }
 

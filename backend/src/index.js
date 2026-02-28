@@ -37,8 +37,11 @@ app.use(helmet());
 app.use(cors({
   origin: [
     'http://localhost:3000',
+    'http://localhost:8000',
     'https://tonebox.mx',
-    'https://tonebox.com.mx' // Agregada por seguridad adicional
+    'https://www.tonebox.mx',
+    'https://tonebox.com.mx',
+    'https://www.tonebox.com.mx',
   ],
   credentials: true,
 }));
