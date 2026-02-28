@@ -271,6 +271,12 @@ model Provider {
   defaultShippingCost  Float                   @default(0)
   active               Boolean                 @default(true)
 
+  // Dropshipping 
+  ejecutivo                 String?
+  whatsapp                  String?
+  emailPedidos              String?
+  instruccionesDropshipping String?
+
   // Relations
   shippingRules        ProviderShippingRule[]
   products             Product[]
