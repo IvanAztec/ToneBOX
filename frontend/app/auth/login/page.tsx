@@ -11,24 +11,24 @@ import { useAuth, useToast } from '../../providers';
 import ToneBoxLogo from '@/components/shared/ToneBoxLogo';
 
 const loginSchema = z.object({
-  email:    z.string().email('Correo electrónico inválido'),
+  email: z.string().email('Correo electrónico inválido'),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
 
-const INK    = '#0B0E14';
-const INK2   = '#161B26';
-const GREEN  = '#00C896';
+const INK = '#0B0E14';
+const INK2 = '#161B26';
+const GREEN = '#00C896';
 const BORDER = 'rgba(255,255,255,0.1)';
-const MUTED  = '#7A8494';
+const MUTED = '#7A8494';
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
   const { addToast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading]       = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -81,10 +81,10 @@ export default function LoginPage() {
           style={{ background: INK2, border: `1px solid ${BORDER}` }}
         >
           <h1 className="font-syne text-2xl font-extrabold mb-1 tracking-tight" style={{ color: 'white' }}>
-            Bienvenido de nuevo
+            Centro de Control ToneBOX
           </h1>
           <p className="mb-8 text-sm" style={{ color: MUTED }}>
-            Inicia sesión para gestionar tus pedidos ToneBOX
+            Gestión inteligente de pedidos y logística en tiempo real
           </p>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -103,11 +103,11 @@ export default function LoginPage() {
                   className="w-full pl-10 pr-4 py-3 rounded-xl text-sm font-medium focus:outline-none transition-colors"
                   style={{
                     background: 'rgba(255,255,255,0.06)',
-                    border:     `1.5px solid ${BORDER}`,
-                    color:      'white',
+                    border: `1.5px solid ${BORDER}`,
+                    color: 'white',
                   }}
-                  onFocus={e  => (e.currentTarget.style.borderColor = GREEN)}
-                  onBlur={e   => (e.currentTarget.style.borderColor = BORDER)}
+                  onFocus={e => (e.currentTarget.style.borderColor = GREEN)}
+                  onBlur={e => (e.currentTarget.style.borderColor = BORDER)}
                 />
               </div>
               {errors.email && (
@@ -129,11 +129,11 @@ export default function LoginPage() {
                   className="w-full pl-10 pr-12 py-3 rounded-xl text-sm font-medium focus:outline-none transition-colors"
                   style={{
                     background: 'rgba(255,255,255,0.06)',
-                    border:     `1.5px solid ${BORDER}`,
-                    color:      'white',
+                    border: `1.5px solid ${BORDER}`,
+                    color: 'white',
                   }}
-                  onFocus={e  => (e.currentTarget.style.borderColor = GREEN)}
-                  onBlur={e   => (e.currentTarget.style.borderColor = BORDER)}
+                  onFocus={e => (e.currentTarget.style.borderColor = GREEN)}
+                  onBlur={e => (e.currentTarget.style.borderColor = BORDER)}
                 />
                 <button
                   type="button"
