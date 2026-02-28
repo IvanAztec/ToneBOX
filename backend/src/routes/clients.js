@@ -12,8 +12,8 @@ import { createRequire } from 'module';
 
 const _require = createRequire(import.meta.url);
 
-const router  = Router();
-const prisma  = new PrismaClient();
+const router = Router();
+const prisma = new PrismaClient();
 
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 const BUSINESS_TYPES = ['INSTITUCION', 'PYME', 'DESPACHO', 'CORPORATIVO', 'REVENDEDOR', 'POR_CLASIFICAR'];
@@ -78,19 +78,19 @@ router.get('/', asyncHandler(async (req, res) => {
     orderBy: { createdAt: 'desc' },
   });
 
-  const csfMap = new Map<string, string>();
+  const csfMap = new Map();
   for (const o of csfOrders) {
-    if (o.userId && !csfMap.has(o.userId)) csfMap.set(o.userId, o.csfUrl!);
+    if (o.userId && !csfMap.has(o.userId)) csfMap.set(o.userId, o.csfUrl);
   }
 
   const data = users.map(u => {
     const ltv = ltvMap.get(u.id);
     return {
       ...u,
-      ltv:          ltv?._sum?.speiTotal ?? 0,
-      orderCount:   ltv?._count?.id      ?? 0,
+      ltv: ltv?._sum?.speiTotal ?? 0,
+      orderCount: ltv?._count?.id ?? 0,
       lastPurchase: ltv?._max?.createdAt ?? null,
-      csfUrl:       csfMap.get(u.id)     ?? null,
+      csfUrl: csfMap.get(u.id) ?? null,
     };
   });
 
@@ -103,9 +103,9 @@ router.get('/alerts', asyncHandler(async (req, res) => {
   const alerts = await computeReplenishmentAlerts();
   const summary = {
     critical: alerts.filter(a => a.level === 'CRITICAL').length,
-    high:     alerts.filter(a => a.level === 'HIGH').length,
-    medium:   alerts.filter(a => a.level === 'MEDIUM').length,
-    total:    alerts.length,
+    high: alerts.filter(a => a.level === 'HIGH').length,
+    medium: alerts.filter(a => a.level === 'MEDIUM').length,
+    total: alerts.length,
   };
   res.json({ success: true, summary, data: alerts });
 }));
@@ -137,21 +137,21 @@ router.get('/export', asyncHandler(async (req, res) => {
   const rows = users.map(u => {
     const ltv = ltvMap.get(u.id);
     return {
-      'No. Cliente':     u.customerNumber,
-      'Nombre':          u.name || '',
-      'Email':           u.email,
-      'Empresa':         u.empresa || '',
-      'Giro':            u.businessType,
-      'Cargo':           u.cargo || '',
-      'Ciudad':          u.ciudad || '',
-      'Estado':          u.estado || '',
-      'WhatsApp':        u.whatsapp || '',
-      'RFC':             u.rfc || '',
-      'Razón Social':    u.razonSocial || '',
-      'LTV ($)':         ltv?._sum?.speiTotal ?? 0,
-      'Pedidos':         ltv?._count?.id ?? 0,
-      'Última Compra':   ltv?._max?.createdAt ? new Date(ltv._max.createdAt).toLocaleDateString('es-MX') : '',
-      'Fecha Registro':  new Date(u.createdAt).toLocaleDateString('es-MX'),
+      'No. Cliente': u.customerNumber,
+      'Nombre': u.name || '',
+      'Email': u.email,
+      'Empresa': u.empresa || '',
+      'Giro': u.businessType,
+      'Cargo': u.cargo || '',
+      'Ciudad': u.ciudad || '',
+      'Estado': u.estado || '',
+      'WhatsApp': u.whatsapp || '',
+      'RFC': u.rfc || '',
+      'Razón Social': u.razonSocial || '',
+      'LTV ($)': ltv?._sum?.speiTotal ?? 0,
+      'Pedidos': ltv?._count?.id ?? 0,
+      'Última Compra': ltv?._max?.createdAt ? new Date(ltv._max.createdAt).toLocaleDateString('es-MX') : '',
+      'Fecha Registro': new Date(u.createdAt).toLocaleDateString('es-MX'),
     };
   });
 
@@ -175,7 +175,7 @@ router.patch('/:id', asyncHandler(async (req, res) => {
 
   const updated = await prisma.user.update({
     where: { id: req.params.id },
-    data:  { businessType: result.data.businessType },
+    data: { businessType: result.data.businessType },
     select: { id: true, businessType: true },
   });
 
