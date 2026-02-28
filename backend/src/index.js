@@ -23,6 +23,7 @@ import paymentRoutes from './routes/payments.js';
 import adminRoutes from './routes/admin.js';
 import companySettingsRoutes from './routes/companySettings.js';
 import clientsRoutes from './routes/clients.js';
+import proveedoresRoutes from './features/proveedores/proveedores.routes.js';
 import { startCTSyncJob } from './jobs/ctSyncJob.js';
 import { startReplenishmentAlertJob } from './jobs/replenishmentAlertJob.js';
 
@@ -74,7 +75,6 @@ apiRouter.use('/admin', adminRoutes);
 apiRouter.use('/company-settings', companySettingsRoutes);
 apiRouter.use('/admin/clients', clientsRoutes);
 
-import proveedoresRoutes from './features/proveedores/proveedores.routes.js';
 apiRouter.use('/admin/proveedores', proveedoresRoutes);
 
 app.use(config.apiPrefix, apiRouter);
