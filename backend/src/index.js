@@ -93,14 +93,14 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // Start Server
-const server = app.listen(config.port, () => {
+const server = app.listen(process.env.PORT || 3000, '0.0.0.0', () => {
   console.log(`
   🚀 Server is running!
 
   Environment: ${config.env}
-  Port: ${config.port}
-  API: http://localhost:${config.port}${config.apiPrefix}
-  Health: http://localhost:${config.port}/health
+  Port: ${process.env.PORT || 3000}
+  API: http://localhost:${process.env.PORT || 3000}${config.apiPrefix}
+  Health: http://localhost:${process.env.PORT || 3000}/health
   `);
 
   // Start CT Online automatic sync (every 4 hours)
