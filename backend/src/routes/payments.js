@@ -7,7 +7,7 @@ import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
-const prisma  = new PrismaClient();
+const prisma = new PrismaClient();
 
 const upload = multer({
     storage: multer.memoryStorage(),
@@ -35,11 +35,11 @@ router.post('/pre-folio', async (req, res) => {
         const { productName, amount, userId } = req.body;
 
         const order = await createOrder({
-            productName:   productName || 'Reserva SPEI',
-            amount:        parseFloat(amount || 0),
+            productName: productName || 'Reserva SPEI',
+            amount: parseFloat(amount || 0),
             paymentMethod: 'SPEI',
-            status:        'PRE_RESERVED',
-            userId:        userId || null,
+            status: 'PRE_RESERVED',
+            userId: userId || null,
         });
 
         res.json({ success: true, folio: order.folio, orderId: order.id });
@@ -51,51 +51,93 @@ router.post('/pre-folio', async (req, res) => {
 
 /**
  * POST /api/payments/spei/confirm
- * El cliente confirma pago SPEI. Crea la orden, genera el folio TB-XXXX y notifica a Iván.
+ * El cliente confirma pago SPEI. Crea la orden, genera el folio TB-XXXX y notifica a Iván con datos fiscales.
  */
-router.post('/spei/confirm', upload.single('receipt'), async (req, res) => {
+router.post('/spei/confirm', upload.fields([
+    { name: 'receipt', maxCount: 1 },
+    { name: 'csf', maxCount: 1 }
+]), async (req, res) => {
     try {
-        const { productName, amount, clientName, clientContact, trackingKey, userId, existingOrderId } = req.body;
+        const {
+            productName, sku, amount, clientName, clientContact, trackingKey, userId,
+            existingOrderId, requiresInvoice, rfc, razonSocial, regimenFiscal
+        } = req.body;
 
         if (!productName || !amount) {
             return res.status(400).json({ error: 'productName y amount son requeridos.' });
         }
 
-        // Si ya existe una pre-orden, usarla; si no, crear una nueva
+        // Datos Fiscales y Archivos
+        const receiptFile = req.files?.['receipt']?.[0];
+        const csfFile = req.files?.['csf']?.[0];
+
+        const orderData = {
+            productName,
+            sku: sku || null,
+            amount: parseFloat(amount),
+            paymentMethod: 'SPEI',
+            userId: userId || null,
+            clientName,
+            clientContact,
+            requiresInvoice: requiresInvoice === 'true',
+            rfc,
+            razonSocial,
+            regimenFiscal,
+            status: 'PENDING_PAYMENT_VALIDATION', // Prioridad: Blindaje v3
+        };
+
         let order;
         if (existingOrderId) {
             order = await prisma.order.findUnique({ where: { id: existingOrderId } });
-            if (!order) order = await createOrder({ productName, amount, paymentMethod: 'SPEI', userId: userId || null, clientName, clientContact });
+            if (order) {
+                // Actualizar orden existente si es el caso
+                order = await prisma.order.update({
+                    where: { id: existingOrderId },
+                    data: { ...orderData, folio: order.folio }
+                });
+            } else {
+                order = await createOrder(orderData);
+            }
         } else {
-            order = await createOrder({ productName, amount, paymentMethod: 'SPEI', userId: userId || null, clientName, clientContact });
+            order = await createOrder(orderData);
         }
 
-        const receiptBuffer   = req.file?.buffer   || null;
-        const receiptMimetype = req.file?.mimetype  || null;
-
-        // Registrar pago y notificar admin
+        // Registrar pago y notificar admin (pasar buffer de CSF si existe)
         const speiPayment = await processSpeiConfirmation(
-            { orderId: order.id, folio: order.folio, trackingKey, amount, productName, clientName, clientContact },
-            receiptBuffer,
-            receiptMimetype
+            {
+                orderId: order.id,
+                folio: order.folio,
+                trackingKey,
+                amount,
+                productName,
+                clientName,
+                clientContact,
+                requiresInvoice: orderData.requiresInvoice,
+                rfc,
+                razonSocial,
+                regimenFiscal
+            },
+            receiptFile?.buffer || null,
+            receiptFile?.mimetype || null,
+            csfFile?.buffer || null // Pasamos el buffer del CSF
         );
 
         // Crear PaymentLog
         await createPaymentLog({
-            orderId:      order.id,
-            folio:        order.folio,
-            clientName:   clientName || null,
-            method:       'SPEI',
-            amount:       parseFloat(amount),
-            status:       'PENDING',
+            orderId: order.id,
+            folio: order.folio,
+            clientName: clientName || null,
+            method: 'SPEI',
+            amount: parseFloat(amount),
+            status: 'PENDING',
             claveRastreo: trackingKey || null,
         });
 
         res.json({
-            success:   true,
-            folio:     order.folio,
+            success: true,
+            folio: order.folio,
             paymentId: speiPayment.id,
-            message:   `Tu pedido ${order.folio} fue registrado. Te contactaremos en cuanto validemos la transferencia.`,
+            message: `Tu pedido ${order.folio} fue registrado. Te contactaremos en cuanto validemos la transferencia.`,
         });
     } catch (error) {
         console.error('SPEI confirm error:', error);
@@ -119,7 +161,7 @@ router.post('/spei/validate-cep', authenticate, async (req, res) => {
         }
 
         // 1. Obtener CLABE de configuración de empresa
-        const settings  = await prisma.companySettings.findUnique({ where: { id: 'tonebox' } });
+        const settings = await prisma.companySettings.findUnique({ where: { id: 'tonebox' } });
         const clabeEsperada = settings?.clabeNumber || process.env.COMPANY_CLABE || '012180004567890123';
 
         // 2. Consultar Banxico CEP
@@ -132,25 +174,25 @@ router.post('/spei/validate-cep', authenticate, async (req, res) => {
 
         // 3. Upsert PaymentLog con datos CEP
         const logData = {
-            method:         'SPEI',
-            amount:         parseFloat(monto),
-            status:         valid ? 'COMPLETED' : 'FAILED',
+            method: 'SPEI',
+            amount: parseFloat(monto),
+            status: valid ? 'COMPLETED' : 'FAILED',
             claveRastreo,
-            cepData:        cep?.raw  ?? null,
-            cepBancoEmisor: cep?.bancoEmisor  ?? null,
+            cepData: cep?.raw ?? null,
+            cepBancoEmisor: cep?.bancoEmisor ?? null,
             cepRfcOrdenante: cep?.rfcOrdenante ?? null,
-            cepHoraCert:    cep?.horaCertificacion ? new Date(cep.horaCertificacion) : null,
-            cepEstado:      cep?.estado ?? null,
-            validatedBy:    'BANXICO_AUTO',
-            validatedAt:    new Date(),
-            notes:          cepError ?? null,
+            cepHoraCert: cep?.horaCertificacion ? new Date(cep.horaCertificacion) : null,
+            cepEstado: cep?.estado ?? null,
+            validatedBy: 'BANXICO_AUTO',
+            validatedAt: new Date(),
+            notes: cepError ?? null,
         };
 
         // Buscar log existente o crear uno nuevo
         const existing = await prisma.paymentLog.findFirst({
             where: {
                 OR: [
-                    orderId       ? { orderId }       : {},
+                    orderId ? { orderId } : {},
                     catalogOrderId ? { catalogOrderId } : {},
                     { claveRastreo },
                 ],
@@ -174,7 +216,7 @@ router.post('/spei/validate-cep', authenticate, async (req, res) => {
             if (catalogOrderId) {
                 await prisma.catalogOrder.update({
                     where: { id: catalogOrderId },
-                    data:  { status: 'PAID' },
+                    data: { status: 'PAID' },
                 });
             }
         }
@@ -214,7 +256,7 @@ router.post('/spei/:id/approve', authenticate, async (req, res) => {
         if (existing) {
             await prisma.paymentLog.update({
                 where: { id: existing.id },
-                data:  { status: 'COMPLETED', validatedBy: 'ADMIN_MANUAL', validatedAt: new Date() },
+                data: { status: 'COMPLETED', validatedBy: 'ADMIN_MANUAL', validatedAt: new Date() },
             });
         }
 
@@ -255,7 +297,7 @@ router.post('/orders', async (req, res) => {
  * POST /api/payments/stripe/webhook
  */
 router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-    const sig            = req.headers['stripe-signature'];
+    const sig = req.headers['stripe-signature'];
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
     if (!endpointSecret) return res.status(400).json({ error: 'Webhook secret no configurado.' });
@@ -286,12 +328,12 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
         if (folio) {
             const order = await markOrderAsPaid(folio, 'CARD');
             await createPaymentLog({
-                orderId:    orderId || null,
-                folio:      folio,
+                orderId: orderId || null,
+                folio: folio,
                 clientName: session.customer_details?.name || null,
-                method:     'STRIPE',
-                amount:     (session.amount_total || 0) / 100,
-                status:     'COMPLETED',
+                method: 'STRIPE',
+                amount: (session.amount_total || 0) / 100,
+                status: 'COMPLETED',
             });
             console.log(`[Stripe Webhook] ✅ Orden ${folio} marcada como PAGADA con tarjeta.`);
         }

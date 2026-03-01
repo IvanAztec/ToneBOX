@@ -1,13 +1,16 @@
 import nodemailer from 'nodemailer';
 import { PrismaClient } from '@prisma/client';
+import { StorageService } from './storageService.js';
 
 const prisma = new PrismaClient();
 
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: process.env.SMTP_HOST || 'smtppro.zoho.com',
+    port: parseInt(process.env.SMTP_PORT, 10) || 465,
+    secure: process.env.SMTP_SECURE === 'true' || true,
     auth: {
-        user: process.env.ADMIN_EMAIL,
-        pass: process.env.ADMIN_EMAIL_PASSWORD,
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
     },
 });
 
@@ -15,10 +18,31 @@ const transporter = nodemailer.createTransport({
  * Procesa la confirmación de pago SPEI:
  * 1. Crea/actualiza el SpeiPayment con PENDING_VALIDATION
  * 2. Dispara correo a Iván con asunto: [FOLIO] - Nueva Orden de [Cliente]
- * 3. Adjunta el comprobante si el cliente lo subió
+ * 3. Incluye datos fiscales y adjunta CSF si aplica
  */
-export async function processSpeiConfirmation(data, receiptBuffer = null, receiptMimetype = null) {
-    const { orderId, folio, amount, productName, trackingKey, clientName, clientContact } = data;
+export async function processSpeiConfirmation(data, receiptBuffer = null, receiptMimetype = null, csfBuffer = null) {
+    const {
+        orderId, folio, amount, productName, trackingKey, clientName, clientContact,
+        requiresInvoice, rfc, razonSocial, regimenFiscal
+    } = data;
+
+    // ── CARGA DE CSF A SUPABASE STORAGE ───────────────────────────────────────
+    let cloudCsfUrl = null;
+    if (csfBuffer && requiresInvoice) {
+        try {
+            const fileName = `csf/CSF_${rfc || 'TEMP'}_${Date.now()}.pdf`;
+            cloudCsfUrl = await StorageService.uploadFile(csfBuffer, fileName, 'application/pdf');
+
+            // Vincular URL a la orden en la base de datos
+            await prisma.order.update({
+                where: { id: orderId },
+                data: { csfUrl: cloudCsfUrl }
+            });
+            console.log(`[SpeiService] ☁️ CSF vinculado a orden: ${cloudCsfUrl}`);
+        } catch (storageErr) {
+            console.error('[SpeiService] ⚠️ Error subiendo CSF a Storage:', storageErr.message);
+        }
+    }
 
     // Construir el folio display (si no viene, usar orderId)
     const displayFolio = folio || orderId;
@@ -41,11 +65,28 @@ export async function processSpeiConfirmation(data, receiptBuffer = null, receip
         ? `https://www.banxico.org.mx/cep/?i=SPEI&t=${trackingKey}`
         : 'https://www.banxico.org.mx/cep/';
 
-    // 3. Correo blindado con asunto estándar ToneBOX
+    // 3. Adjuntos
+    const attachments = [];
+    if (receiptBuffer) {
+        attachments.push({
+            filename: `comprobante-${displayFolio}.${receiptMimetype?.split('/')[1] || 'pdf'}`,
+            content: receiptBuffer,
+            contentType: receiptMimetype,
+        });
+    }
+    if (csfBuffer) {
+        attachments.push({
+            filename: `CSF-${rfc || displayFolio}.pdf`,
+            content: csfBuffer,
+            contentType: 'application/pdf',
+        });
+    }
+
+    // 4. Correo blindado con asunto estándar ToneBOX
     const emailContent = {
-        from: `"ToneBOX Sistema" <${process.env.ADMIN_EMAIL}>`,
-        to: process.env.ADMIN_PERSONAL_EMAIL || process.env.ADMIN_EMAIL,
-        subject: `[${displayFolio}] - Nueva Orden de ${displayClient}`,
+        from: `"ToneBOX Sistema" <${process.env.SMTP_USER}>`,
+        to: process.env.ADMIN_PERSONAL_EMAIL || process.env.SMTP_USER,
+        subject: `[${displayFolio}] - Nueva Orden de ${displayClient}${requiresInvoice ? ' (FACTURA)' : ''}`,
         html: `
             <div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto; background: #fff;">
                 <!-- Header -->
@@ -59,10 +100,6 @@ export async function processSpeiConfirmation(data, receiptBuffer = null, receip
                 <div style="padding: 32px; border: 1px solid #f3f4f6; border-top: none; border-radius: 0 0 16px 16px;">
                     <table style="width: 100%; font-size: 14px; border-collapse: collapse; margin-bottom: 24px;">
                         <tr style="border-bottom: 1px solid #f3f4f6;">
-                            <td style="padding: 12px 0; color: #6b7280; font-weight: 600;">Folio</td>
-                            <td style="padding: 12px 0; font-weight: 900; font-family: monospace; font-size: 16px;">${displayFolio}</td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid #f3f4f6;">
                             <td style="padding: 12px 0; color: #6b7280; font-weight: 600;">Producto</td>
                             <td style="padding: 12px 0; font-weight: 700;">${productName}</td>
                         </tr>
@@ -70,19 +107,23 @@ export async function processSpeiConfirmation(data, receiptBuffer = null, receip
                             <td style="padding: 12px 0; color: #6b7280; font-weight: 600;">Monto</td>
                             <td style="padding: 12px 0; font-weight: 900; color: #059669; font-size: 22px;">$${parseFloat(amount).toFixed(2)} MXN</td>
                         </tr>
+                        ${requiresInvoice ? `
+                        <tr style="border-bottom: 1px solid #f3f4f6; background: #fefce8;">
+                            <td style="padding: 12px 8px; color: #b45309; font-weight: 900;">REQUIERE FACTURA</td>
+                            <td style="padding: 12px 8px; font-size: 12px;">
+                                <strong>RFC:</strong> ${rfc}<br/>
+                                <strong>Razón Social:</strong> ${razonSocial}<br/>
+                                <strong>Régimen:</strong> ${regimenFiscal}<br/>
+                                ${cloudCsfUrl ? `<a href="${cloudCsfUrl}" target="_blank" style="color: #1d4ed8; text-decoration: underline;">📄 Ver Constancia Fiscal (CSF)</a>` : ''}
+                            </td>
+                        </tr>` : ''}
                         ${trackingKey ? `
                         <tr style="border-bottom: 1px solid #f3f4f6;">
                             <td style="padding: 12px 0; color: #6b7280; font-weight: 600;">Clave de Rastreo</td>
                             <td style="padding: 12px 0; font-family: monospace; font-weight: 700; color: #1d4ed8;">${trackingKey}</td>
                         </tr>` : ''}
-                        ${clientContact ? `
-                        <tr>
-                            <td style="padding: 12px 0; color: #6b7280; font-weight: 600;">Contacto Cliente</td>
-                            <td style="padding: 12px 0; font-weight: 700;">${clientContact}</td>
-                        </tr>` : ''}
                     </table>
 
-                    <!-- Acción Principal: Verificar en Banxico -->
                     <a href="${banxeoCepUrl}" target="_blank" 
                        style="display: block; background: #1d4ed8; color: white; text-align: center; 
                               padding: 18px; border-radius: 12px; font-weight: 900; font-size: 15px; 
@@ -96,16 +137,10 @@ export async function processSpeiConfirmation(data, receiptBuffer = null, receip
                 </div>
             </div>
         `,
-        attachments: receiptBuffer ? [
-            {
-                filename: `comprobante-${displayFolio}.${receiptMimetype?.split('/')[1] || 'pdf'}`,
-                content: receiptBuffer,
-                contentType: receiptMimetype,
-            }
-        ] : [],
+        attachments
     };
 
-    // 4. Enviar correo
+    // 5. Enviar correo
     try {
         await transporter.sendMail(emailContent);
         console.log(`[SpeiService] ✅ Correo enviado: "${emailContent.subject}"`);

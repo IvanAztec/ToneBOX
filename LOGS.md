@@ -1,54 +1,78 @@
-# 📜 Bitácora de Configuración Técnica (ToneBOX)
+# ToneBOX System Logs & Configuration
 
-Este archivo sirve como memoria técnica para el mantenimiento del sistema de Dropshipping y Automatización de Pedidos.
+## 📧 Zoho SMTP Configuration
+The system uses Zoho Mail for automated logistics and notifications.
 
-## 📧 Configuración de Correo (Zoho SMTP)
-
-Para el envío de órdenes automáticas a proveedores, se utiliza el servidor SMTP de Zoho Pro.
-
-**Variables en `.env` (Backend):**
-*   `SMTP_HOST`: `smtppro.zoho.com`
-*   `SMTP_PORT`: `465` (SSL)
-*   `SMTP_SECURE`: `true`
-*   `SMTP_USER`: `pedidos@tonebox.com.mx`
-*   `SMTP_PASS`: Configurada el 2026-02-28 (Zoho App Password).
-
-**Lógica de Envío:**
-*   **Remitente:** `ToneBOX Pedidos Automáticos <pedidos@tonebox.com.mx>`
-*   **Copia (CC):** Siempre a `hola@tonebox.com.mx`.
-*   **Destinatario:** Dinámico basado en el campo `emailPedidos` de la tabla `providers`.
-
-## 🗄️ Esquema de Base de Datos (Supabase / Prisma)
-
-Se añadieron campos específicos para la gestión de Dropshipping en la tabla `providers`.
-
-**SQL Manual ejecutado el 2026-02-28:**
-```sql
-ALTER TABLE providers ADD COLUMN IF NOT EXISTS ejecutivo TEXT;
-ALTER TABLE providers ADD COLUMN IF NOT EXISTS whatsapp TEXT;
-ALTER TABLE providers ADD COLUMN IF NOT EXISTS "emailPedidos" TEXT;
-ALTER TABLE providers ADD COLUMN IF NOT EXISTS "instruccionesDropshipping" TEXT;
-```
-
-**Modelo Prisma (`schema.prisma`):**
-```prisma
-model Provider {
-  id                   String                  @id @default(cuid())
-  name                 String
-  ejecutivo            String?
-  whatsapp             String?
-  emailPedidos         String?
-  instruccionesDropshipping String?
-  active               Boolean                 @default(true)
-  // ... otros campos logísticos
-}
-```
-
-## 🛠️ Procedimiento de Recuperación (Quick Fix)
-
-1.  **Si el correo no sale:** Verificar que la contraseña en `.env` no haya expirado o haya sido revocada en el panel de Zoho.
-2.  **Si falla el guardado de proveedores:** Asegurarse de que el Prisma Client esté generado (`npx prisma generate`) y que las columnas SQL existan en la tabla física de Supabase.
-3.  **Logs de Servidor:** Revisar la consola del backend para errores de Nodemailer (ej. `EAUTH` credenciales inválidas).
+- **Host**: `smtp.zoho.com`
+- **Port**: `465` (SSL) / `587` (TLS)
+- **User**: `ivan@tonebox.mx`
+- **Password**: `Q3N!fAxqB2bnJ3Y`
+- **From Name**: `ToneBOX Logistics System`
 
 ---
-*Última Actualización: 2026-02-28 por Antigravity / ToneBOX Force.*
+
+## 🏗️ Supabase Database Schema (Prisma)
+
+### Core Models
+
+#### `User`
+- Central identity for customers and admins.
+- Includes profile data (RFC, city, state) and shipping/billing info.
+- Roles: `user`, `admin`.
+
+#### `Order`
+- Tracks payments for bundles/combos via PaymentGateway.
+- Folio format: `TB-####`.
+
+#### `CatalogOrder`
+- Tracks multi-item purchases from the public catalog.
+- Statuses: `PENDING_PAYMENT_VALIDATION`, `COMPLETED`, etc.
+
+#### `Provider`
+- Logistics vendors (CT, etc.).
+- Includes Dropshipping info: `emailPedidos`, `instruccionesDropshipping`, `ejecutivo`.
+
+#### `Product` & `ProductBundle`
+- Inventory items and specific combinations (Duo Pack, Business Start).
+- Linked to `Provider`.
+
+#### `SpeiPayment`
+- Records manual transfers for validation.
+- Fields: `trackingKey`, `status` (`PENDING_VALIDATION`, `APPROVED`).
+
+#### `PaymentLog`
+- Audit trail for all financial transactions (Stripe/SPEI).
+- Stores Banxico CEP data for automated verification.
+
+#### `DemandCaptureLead`
+- Stores contact info from the modal when a product is `OUT_OF_STOCK` or `ON_DEMAND`.
+
+---
+
+## 🛡️ Blindaje v3.0 — Fiscal & Logístico (SAT 4.0)
+
+### ☁️ Cloud Storage (Supabase)
+El sistema utiliza un bucket privado llamado `documents` para almacenar archivos sensibles.
+- **StorageService**: (`backend/src/services/storageService.js`)
+- **Seguridad**: Se utilizan **Signed URLs** (URLs Firmadas) con una vigencia de 7 días. Esto asegura que los archivos (como la CSF) no sean públicos, pero que Iván y los proveedores puedan verlos desde el correo.
+- **Flujo**: `Frontend -> Backend (Buffer) -> Supabase Storage -> Signed URL -> Email`.
+
+### 🏦 Validación SPEI — Banxico CEP
+Proceso automatizado para eliminar el error humano en conciliaciones bancarias.
+1. **Captura**: El cliente ingresa su clave de rastreo en el checkout (opcional) o sube su comprobante.
+2. **Auditoría (Admin)**: Iván abre el `CepModal` en el Panel de Ingresos e ingresa/confirma la Clave de Rastreo.
+3. **Validación**: El sistema consulta el API del Banco de México.
+4. **Activación**: Si el estatus es `LIQUIDADO`, el sistema marca la orden como `PAID_SPEI` y dispara el gatillo de dropshipping.
+
+### 📦 Logística Proactiva (Dropshipping)
+- **Gatillo**: Se dispara en `orderService.js` inmediatamente tras detectar el pago.
+- **Correo Blindado**: El correo a proveedores (`testPiloto`) usa un template HTML con jerarquía visual crítica para resaltar instrucciones de "Remitente Ciego".
+- **Instrucciones**: Queda estrictamente prohibido incluir publicidad o facturas del proveedor.
+
+---
+
+## 🛠️ Infrastructure
+- **Frontend**: Next.js (App Router) en Vercel.
+- **Backend**: Express.js en Railway.
+- **Database**: PostgreSQL en Supabase.
+- **Storage**: Supabase Storage (Bucket: `documents`).

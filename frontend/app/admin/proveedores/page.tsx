@@ -16,7 +16,9 @@ interface Proveedor {
 
 export default function ProveedoresPage() {
     const [proveedores, setProveedores] = useState<Proveedor[]>([]);
+    const [historial, setHistorial] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<'lista' | 'historial'>('lista');
 
     // Modal State
     const [showTestModal, setShowTestModal] = useState(false);
@@ -30,7 +32,18 @@ export default function ProveedoresPage() {
 
     useEffect(() => {
         fetchMainData();
+        fetchHistorial();
     }, []);
+
+    const fetchHistorial = async () => {
+        try {
+            const res = await fetch('/api/admin/proveedores/historial');
+            const json = await res.json();
+            if (json.success) setHistorial(json.data);
+        } catch (e) {
+            console.error(e);
+        }
+    };
 
     const fetchMainData = async () => {
         setLoading(true);
@@ -65,6 +78,7 @@ export default function ProveedoresPage() {
             if (data.success) {
                 alert('✅ ¡El correo de despacho fue enviado exitosamente (vía SMTP ToneBOX) a ' + selectedProv.emailPedidos + '!');
                 setShowTestModal(false);
+                fetchHistorial(); // Refrescar historial
             } else {
                 alert('⚠️ Falla de Servidor SMTP:\n\n' + data.error + '\n\nRevise el archivo .env de su backend y configure SMTP_HOST, USER y PASS.');
             }
@@ -95,11 +109,27 @@ export default function ProveedoresPage() {
                     </button>
                 </div>
 
+                {/* Tabs */}
+                <div className="flex border-b border-slate-700">
+                    <button
+                        onClick={() => setActiveTab('lista')}
+                        className={`px-6 py-3 font-bold text-sm transition-all border-b-2 ${activeTab === 'lista' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-400 hover:text-slate-300'}`}
+                    >
+                        Directorio de Proveedores
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('historial')}
+                        className={`px-6 py-3 font-bold text-sm transition-all border-b-2 ${activeTab === 'historial' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-400 hover:text-slate-300'}`}
+                    >
+                        Historial de Envíos
+                    </button>
+                </div>
+
                 {loading ? (
                     <div className="h-64 flex items-center justify-center">
                         <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
                     </div>
-                ) : (
+                ) : activeTab === 'lista' ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {proveedores.map(prov => (
                             <div key={prov.id} className="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm hover:border-slate-600 transition-all flex flex-col justify-between">
@@ -148,8 +178,8 @@ export default function ProveedoresPage() {
                                         onClick={() => { if (prov.emailPedidos) { setSelectedProv(prov); setShowTestModal(true); } else { alert('⚠️ Error: Debes configurar un Email de Pedidos antes de enviar.'); } }}
                                         disabled={!prov.emailPedidos}
                                         className={`flex-1 flex items-center justify-center gap-2 font-medium py-2 rounded-lg text-sm transition-colors border ${prov.emailPedidos
-                                                ? 'bg-slate-700 hover:bg-slate-600 text-white border-slate-600'
-                                                : 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed grayscale'
+                                            ? 'bg-slate-700 hover:bg-slate-600 text-white border-slate-600'
+                                            : 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed grayscale'
                                             }`}
                                     >
                                         <Send className={`w-4 h-4 ${prov.emailPedidos ? 'text-blue-400' : 'text-slate-600'}`} />
@@ -161,6 +191,49 @@ export default function ProveedoresPage() {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                ) : (
+                    <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-sm">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-slate-900/50 text-slate-400 font-bold uppercase text-[10px] border-b border-slate-700">
+                                    <tr>
+                                        <th className="px-6 py-4">Fecha</th>
+                                        <th className="px-6 py-4">Proveedor</th>
+                                        <th className="px-6 py-4">SKU</th>
+                                        <th className="px-6 py-4">Cant.</th>
+                                        <th className="px-6 py-4">Guía Pakke</th>
+                                        <th className="px-6 py-4 text-center">Estatus</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-700/50">
+                                    {historial.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={6} className="px-6 py-12 text-center text-slate-500 italic">No hay registros de envíos recientes.</td>
+                                        </tr>
+                                    ) : (
+                                        historial.map((log) => (
+                                            <tr key={log.id} className="hover:bg-slate-700/20 transition-colors">
+                                                <td className="px-6 py-4 text-slate-400 font-medium whitespace-nowrap">
+                                                    {new Date(log.createdAt).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                </td>
+                                                <td className="px-6 py-4 font-bold text-white">
+                                                    {log.provider?.name || log.providerName}
+                                                </td>
+                                                <td className="px-6 py-4 font-mono text-blue-400 uppercase">{log.sku}</td>
+                                                <td className="px-6 py-4 text-slate-300">{log.quantity}</td>
+                                                <td className="px-6 py-4 text-slate-400 break-all">{log.pakkeGuide}</td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <span className={`px-2 py-1 rounded-full text-[10px] font-black ${log.status === 'SENT' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                                                        {log.status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 )}
 
@@ -234,7 +307,6 @@ export default function ProveedoresPage() {
                         </div>
                     </div>
                 )}
-
             </div>
         </DashboardLayout>
     );

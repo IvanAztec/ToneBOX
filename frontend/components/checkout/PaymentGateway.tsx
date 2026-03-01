@@ -17,8 +17,8 @@ interface PaymentGatewayProps {
 
 // Datos bancarios default (se sobreescriben con /api/company-settings)
 const BANK_DEFAULTS = {
-    clabe:       '012180004567890123',
-    bank:        'BBVA Bancomer',
+    clabe: '012180004567890123',
+    bank: 'BBVA Bancomer',
     beneficiary: 'ToneBOX México S.A. de C.V.',
 };
 
@@ -31,22 +31,52 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
     availabilityStatus = 'IN_STOCK',
     comboType,
 }) => {
-    const [method, setMethod]               = useState<'card' | 'spei'>('card');
-    const [speiStep, setSpeiStep]           = useState<'info' | 'upload' | 'confirmed'>('info');
-    const [trackingKey, setTrackingKey]     = useState('');
-    const [uploadedFile, setUploadedFile]   = useState<File | null>(null);
-    const [copiedClabe, setCopiedClabe]     = useState(false);
-    const [copiedFolio, setCopiedFolio]     = useState(false);
-    const [loading, setLoading]             = useState(false);
-    const [loadingFolio, setLoadingFolio]   = useState(false);
-    const [result, setResult]               = useState<{ folio: string; paymentId: string } | null>(null);
-    const [preFolio, setPreFolio]           = useState<string | null>(null);
-    const [preOrderId, setPreOrderId]       = useState<string | null>(null);
+    const [method, setMethod] = useState<'card' | 'spei'>('card');
+    const [speiStep, setSpeiStep] = useState<'info' | 'upload' | 'confirmed'>('info');
+    const [trackingKey, setTrackingKey] = useState('');
+    const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+    const [copiedClabe, setCopiedClabe] = useState(false);
+    const [copiedFolio, setCopiedFolio] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [loadingFolio, setLoadingFolio] = useState(false);
+    const [result, setResult] = useState<{ folio: string; paymentId: string } | null>(null);
+    const [preFolio, setPreFolio] = useState<string | null>(null);
+    const [preOrderId, setPreOrderId] = useState<string | null>(null);
     const [deliveryMethod, setDeliveryMethod] = useState<'envio' | 'sucursal'>('envio');
-    const [contactName, setContactName]     = useState('');
-    const [contactWA, setContactWA]         = useState('');
-    const [bankInfo, setBankInfo]           = useState(BANK_DEFAULTS);
+    const [contactName, setContactName] = useState('');
+    const [contactWA, setContactWA] = useState('');
+    const [bankInfo, setBankInfo] = useState(BANK_DEFAULTS);
+
+    // Módulo Fiscal
+    const [requiresInvoice, setRequiresInvoice] = useState(false);
+    const [rfc, setRfc] = useState('');
+    const [razonSocial, setRazonSocial] = useState('');
+    const [regimenFiscal, setRegimenFiscal] = useState('601');
+    const [csfFile, setCsfFile] = useState<File | null>(null);
+
     const fileRef = useRef<HTMLInputElement>(null);
+    const csfRef = useRef<HTMLInputElement>(null);
+
+    const TAX_REGIMES = [
+        { code: '601', name: 'General de Ley Personas Morales' },
+        { code: '603', name: 'Personas Morales con Fines no Lucrativos' },
+        { code: '605', name: 'Sueldos y Salarios e Ingresos Asimilados a Salarios' },
+        { code: '606', name: 'Arrendamiento' },
+        { code: '607', name: 'Régimen de Enajenación o Adquisición de Bienes' },
+        { code: '608', name: 'Demás ingresos' },
+        { code: '610', name: 'Residentes en el Extranjero sin Establecimiento Permanente en México' },
+        { code: '611', name: 'Ingresos por Dividendos (socios y accionistas)' },
+        { code: '612', name: 'Personas Físicas con Actividades Empresariales y Profesionales' },
+        { code: '614', name: 'Ingresos por Intereses' },
+        { code: '615', name: 'Régimen de los ingresos por obtención de premios' },
+        { code: '616', name: 'Sin obligaciones fiscales' },
+        { code: '621', name: 'Incorporación Fiscal' },
+        { code: '622', name: 'Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras (AGAPES)' },
+        { code: '623', name: 'Opcional para Grupos de Sociedades' },
+        { code: '624', name: 'Coordinados' },
+        { code: '625', name: 'Régimen de las Actividades Empresariales con ingresos a través de Plataformas Tecnológicas' },
+        { code: '626', name: 'Régimen Simplificado de Confianza (RESICO)' }
+    ];
 
     const hasHardware = comboType === 'BUSINESS_START';
 
@@ -57,18 +87,18 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
             .then(d => {
                 if (d.success && d.data) {
                     setBankInfo({
-                        clabe:       d.data.clabeNumber  || BANK_DEFAULTS.clabe,
-                        bank:        d.data.bankName     || BANK_DEFAULTS.bank,
+                        clabe: d.data.clabeNumber || BANK_DEFAULTS.clabe,
+                        bank: d.data.bankName || BANK_DEFAULTS.bank,
                         beneficiary: d.data.beneficiario || BANK_DEFAULTS.beneficiary,
                     });
                 }
             })
-            .catch(() => {});
+            .catch(() => { });
     }, []);
 
-    const speiPrice      = parseFloat((basePrice / 1.04).toFixed(2));
+    const speiPrice = parseFloat((basePrice / 1.04).toFixed(2));
     const discountAmount = method === 'spei' ? parseFloat((basePrice - speiPrice).toFixed(2)) : 0;
-    const finalPrice     = method === 'spei' ? speiPrice : basePrice;
+    const finalPrice = method === 'spei' ? speiPrice : basePrice;
 
     const waPickupMsg = encodeURIComponent(
         `Hola ToneBOX, quiero pasar a recoger:\n*${productName}*\nTotal: $${basePrice.toFixed(2)} MXN\nMi nombre: ${contactName || 'Cliente'}\n¿Cuándo puedo pasar?`
@@ -94,9 +124,9 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
         setLoadingFolio(true);
         try {
             const res = await fetch('/api/payments/pre-folio', {
-                method:  'POST',
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ productName, amount: speiPrice, userId }),
+                body: JSON.stringify({ productName, amount: speiPrice, userId }),
             });
             const data = await res.json();
             if (data.success) {
@@ -117,14 +147,23 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
             const formData = new FormData();
             formData.append('productName', productName);
             formData.append('amount', finalPrice.toString());
-            if (contactName)  formData.append('clientName',    contactName);
-            if (contactWA)    formData.append('clientContact', contactWA);
-            if (userId)       formData.append('userId',        userId);
-            if (trackingKey)  formData.append('trackingKey',   trackingKey);
-            if (preOrderId)   formData.append('existingOrderId', preOrderId);
+            if (contactName) formData.append('clientName', contactName);
+            if (contactWA) formData.append('clientContact', contactWA);
+            if (userId) formData.append('userId', userId);
+            if (trackingKey) formData.append('trackingKey', trackingKey);
+            if (preOrderId) formData.append('existingOrderId', preOrderId);
             if (uploadedFile) formData.append('receipt', uploadedFile);
 
-            const res  = await fetch('/api/payments/spei/confirm', { method: 'POST', body: formData });
+            // Blindaje Fiscal (Prioridad SAT 4.0)
+            if (requiresInvoice) {
+                formData.append('requiresInvoice', 'true');
+                formData.append('rfc', rfc);
+                formData.append('razonSocial', razonSocial);
+                formData.append('regimenFiscal', regimenFiscal);
+                if (csfFile) formData.append('csf', csfFile);
+            }
+
+            const res = await fetch('/api/payments/spei/confirm', { method: 'POST', body: formData });
             const data = await res.json();
             if (data.success) {
                 setResult({ folio: data.folio, paymentId: data.paymentId });
@@ -272,6 +311,72 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
                     <p className="text-[11px] text-gray-400 mt-2 text-center">Sin contraseña · Sin registro · Solo WhatsApp</p>
                 </div>
 
+                {/* ── C. Módulo Fiscal ── */}
+                <div className="mb-6 p-5 border-2 border-gray-100 rounded-[2rem] bg-gray-50/30">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-emerald-600" />
+                            <span className="text-sm font-black text-gray-900">¿Requieres Factura?</span>
+                        </div>
+                        <button
+                            onClick={() => setRequiresInvoice(!requiresInvoice)}
+                            className={`w-12 h-6 rounded-full p-1 transition-all ${requiresInvoice ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                        >
+                            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${requiresInvoice ? 'translate-x-6' : 'translate-x-0'}`} />
+                        </button>
+                    </div>
+
+                    {requiresInvoice && (
+                        <div className="space-y-4 animate-in slide-in-from-top-2">
+                            <input
+                                type="text"
+                                placeholder="RFC (12 o 13 caracteres)"
+                                value={rfc}
+                                onChange={e => setRfc(e.target.value.toUpperCase())}
+                                className="w-full border-2 border-gray-200 bg-white rounded-xl px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-500 uppercase font-mono"
+                            />
+                            <input
+                                type="text"
+                                placeholder="Razón Social (idéntico a CSF)"
+                                value={razonSocial}
+                                onChange={e => setRazonSocial(e.target.value.toUpperCase())}
+                                className="w-full border-2 border-gray-200 bg-white rounded-xl px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-500 uppercase"
+                            />
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Regimen Fiscal (SAT 4.0)</label>
+                                <select
+                                    value={regimenFiscal}
+                                    onChange={e => setRegimenFiscal(e.target.value)}
+                                    className="w-full border-2 border-gray-200 bg-white rounded-xl px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-500 appearance-none"
+                                >
+                                    {TAX_REGIMES.map(r => (
+                                        <option key={r.code} value={r.code}>{r.code} - {r.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => csfRef.current?.click()}
+                                className={`w-full border-2 border-dashed rounded-xl p-4 transition-all text-center ${csfFile ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 hover:border-gray-400'}`}
+                            >
+                                <input ref={csfRef} type="file" accept=".pdf" className="hidden" onChange={(e) => setCsfFile(e.target.files?.[0] || null)} />
+                                {csfFile ? (
+                                    <div className="flex items-center justify-center gap-2 text-emerald-700">
+                                        <Check className="w-4 h-4" />
+                                        <span className="text-xs font-bold truncate max-w-[200px]">{csfFile.name}</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center gap-1">
+                                        <Upload className="w-4 h-4 text-gray-400" />
+                                        <span className="text-xs text-gray-500 font-bold">Subir Constancia Fiscal (PDF)</span>
+                                    </div>
+                                )}
+                            </button>
+                        </div>
+                    )}
+                </div>
+
                 {deliveryMethod === 'sucursal' ? (
                     <a
                         href={`https://wa.me/${WA_NUMBER}?text=${waPickupMsg}`}
@@ -293,11 +398,10 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
                                     {/* Tarjeta */}
                                     <button
                                         onClick={() => { setMethod('card'); setSpeiStep('info'); }}
-                                        className={`flex items-center justify-between p-5 rounded-2xl border-2 transition-all ${
-                                            method === 'card'
-                                                ? 'border-emerald-500 bg-emerald-50/50'
-                                                : 'border-gray-100 hover:border-gray-200'
-                                        }`}
+                                        className={`flex items-center justify-between p-5 rounded-2xl border-2 transition-all ${method === 'card'
+                                            ? 'border-emerald-500 bg-emerald-50/50'
+                                            : 'border-gray-100 hover:border-gray-200'
+                                            }`}
                                     >
                                         <div className="flex items-center gap-4">
                                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${method === 'card' ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
@@ -318,11 +422,10 @@ const PaymentGateway: React.FC<PaymentGatewayProps> = ({
                                     {/* SPEI */}
                                     <button
                                         onClick={handleSelectSpei}
-                                        className={`flex items-center justify-between p-5 rounded-2xl border-2 transition-all relative ${
-                                            method === 'spei'
-                                                ? 'border-emerald-500 bg-emerald-50/30'
-                                                : 'border-gray-100 hover:border-emerald-200'
-                                        }`}
+                                        className={`flex items-center justify-between p-5 rounded-2xl border-2 transition-all relative ${method === 'spei'
+                                            ? 'border-emerald-500 bg-emerald-50/30'
+                                            : 'border-gray-100 hover:border-emerald-200'
+                                            }`}
                                     >
                                         <div className="flex items-center gap-4">
                                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${method === 'spei' ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-400'}`}>

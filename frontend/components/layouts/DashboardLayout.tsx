@@ -18,36 +18,36 @@ interface NavItem {
 }
 
 const navigation: NavItem[] = [
-  { name: 'Panel Principal',    href: '/dashboard',            icon: LayoutDashboard },
-  { name: 'Inventario CT',      href: '/admin/inventory',      icon: Package,       adminOnly: true },
-  { name: 'Importar Catálogos', href: '/admin/providers',      icon: Truck,         adminOnly: true },
-  { name: 'Zona Crítica',       href: '/admin/critical',       icon: AlertTriangle, adminOnly: true },
-  { name: 'Campañas de Cierre', href: '/admin/campanas',       icon: Megaphone,     adminOnly: true },
-  { name: 'Mis Pedidos',        href: '/dashboard/billing',    icon: CreditCard },
-  { name: 'CRM Clientes',       href: '/dashboard/teams',      icon: Users,        adminOnly: true },
-  { name: 'Registro de Ingresos', href: '/admin/ingresos',     icon: ReceiptText,  adminOnly: true },
-  { name: 'Mi Empresa',         href: '/dashboard/workspaces', icon: Building2 },
-  { name: 'Configuración',      href: '/dashboard/settings',   icon: Settings },
+  { name: 'Panel Principal', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Inventario CT', href: '/admin/inventory', icon: Package, adminOnly: true },
+  { name: 'Importar Catálogos', href: '/admin/providers', icon: Truck, adminOnly: true },
+  { name: 'Zona Crítica', href: '/admin/critical', icon: AlertTriangle, adminOnly: true },
+  { name: 'Campañas de Cierre', href: '/admin/campanas', icon: Megaphone, adminOnly: true },
+  { name: 'Mis Pedidos', href: '/dashboard/billing', icon: CreditCard },
+  { name: 'CRM Clientes', href: '/dashboard/teams', icon: Users, adminOnly: true },
+  { name: 'Registro de Ingresos', href: '/admin/ingresos', icon: ReceiptText, adminOnly: true },
+  { name: 'Mi Empresa', href: '/dashboard/workspaces', icon: Building2 },
+  { name: 'Configuración', href: '/dashboard/settings', icon: Settings },
 ];
 
-const INK  = '#0B0E14';
-const INK2 = '#161B26';
-const GREEN = '#00C896';
-const BORDER = 'rgba(255,255,255,0.08)';
-const MUTED  = '#7A8494';
+const INK = '#0B0F1A'; // Un poco más profundo pero saturado
+const INK2 = '#1E293B'; // Slate-800, mucho mejor contraste que el anterior
+const GREEN = '#00E8A8'; // Un verde un poco más vibrante
+const BORDER = 'rgba(255,255,255,0.12)';
+const MUTED = '#94A3B8'; // Slate-400, mayor legibilidad
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  const pathname   = usePathname();
+  const pathname = usePathname();
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  const toggleSidebar  = useCallback(() => setSidebarOpen(p => !p), []);
-  const closeSidebar   = useCallback(() => setSidebarOpen(false), []);
+  const toggleSidebar = useCallback(() => setSidebarOpen(p => !p), []);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
   const toggleUserMenu = useCallback(() => setUserMenuOpen(p => !p), []);
-  const handleLogout   = useCallback(() => logout(), [logout]);
+  const handleLogout = useCallback(() => logout(), [logout]);
 
-  const isAdmin    = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin';
   const visibleNav = navigation.filter(item => !item.adminOnly || isAdmin);
 
   return (
@@ -103,7 +103,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   className="flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors text-sm"
                   style={{
                     background: isActive ? 'rgba(0,200,150,0.1)' : 'transparent',
-                    color:      isActive ? GREEN : MUTED,
+                    color: isActive ? GREEN : MUTED,
                     fontWeight: isActive ? 700 : 500,
                   }}
                   onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255,255,255,0.04)'; }}

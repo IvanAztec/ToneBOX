@@ -17,6 +17,12 @@ router.get('/', asyncHandler(async (req, res) => {
     res.json({ success: true, data: providers });
 }));
 
+// GET /api/admin/proveedores/historial -> Historial de pedidos enviados
+router.get('/historial', asyncHandler(async (req, res) => {
+    const history = await ProveedoresService.getAllOrderLogs();
+    res.json({ success: true, data: history });
+}));
+
 // GET /api/admin/proveedores/:id -> Obtiene detalles de un proveedor
 router.get('/:id', asyncHandler(async (req, res) => {
     const provider = await ProveedoresService.getProveedorById(req.params.id);

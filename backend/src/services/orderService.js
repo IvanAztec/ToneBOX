@@ -19,30 +19,33 @@ export function generateFolio(orderNumber) {
 }
 
 /**
- * Crea una nueva orden con folio automático.
- * El orderNumber lo asigna PostgreSQL desde la secuencia (empieza en 1000).
- *
+ * Crea una nueva orden con folio automático y blindaje fiscal.
  * @param {Object} data
- * @param {string} data.productName
- * @param {number} data.amount
- * @param {string} data.paymentMethod - 'SPEI' | 'CARD'
- * @param {string} [data.userId]
- * @param {string} [data.clientName]
- * @param {string} [data.clientContact]
  */
 export async function createOrder(data) {
-    const { productName, amount, paymentMethod, userId, clientName, clientContact } = data;
+    const {
+        productName, sku, amount, paymentMethod, userId, clientName, clientContact,
+        requiresInvoice, rfc, razonSocial, regimenFiscal, usoCFDI, csfUrl
+    } = data;
 
     // Crear la orden — el orderNumber lo genera la BD automáticamente
     const order = await prisma.order.create({
         data: {
-            folio: 'TB-TEMP', // Placeholder temporal; se actualiza en el siguiente paso
+            folio: 'TB-TEMP', // Placeholder temporal
             productName,
+            sku: sku || null,
             amount,
             paymentMethod,
+            status: data.status || 'PENDING',
             userId: userId || null,
             clientName: clientName || null,
             clientContact: clientContact || null,
+            requiresInvoice: !!requiresInvoice,
+            rfc: rfc || null,
+            razonSocial: razonSocial || null,
+            regimenFiscal: regimenFiscal || null,
+            usoCFDI: usoCFDI || null,
+            csfUrl: csfUrl || null,
         }
     });
 
@@ -53,24 +56,54 @@ export async function createOrder(data) {
         data: { folio }
     });
 
-    console.log(`[OrderService] ✅ Orden creada: ${folio} | $${amount} MXN | ${paymentMethod}`);
+    console.log(`[OrderService] ✅ Orden creada: ${folio} | SKU: ${sku || 'N/A'} | Fiscal: ${requiresInvoice ? 'SÍ' : 'NO'}`);
     return finalOrder;
 }
 
 /**
  * Marca una orden como PAGADA (SPEI o Tarjeta).
+ * Si tiene SKU, dispara automáticamente la lógica de Dropshipping.
  */
 export async function markOrderAsPaid(folioOrId, method = 'SPEI') {
     const isId = folioOrId.startsWith('clx') || folioOrId.length > 10 && !folioOrId.startsWith('TB');
     const where = isId ? { id: folioOrId } : { folio: folioOrId };
 
-    return prisma.order.update({
+    const order = await prisma.order.update({
         where,
         data: {
             status: method === 'SPEI' ? 'PAID_SPEI' : 'PAID_CARD',
             paymentMethod: method,
         }
     });
+
+    // ── GATILLO DE DROPSHIPPING AUTOMÁTICO ────────────────────────────────────
+    if (order.sku) {
+        try {
+            // Intentar importar dinámicamente para evitar ciclos si los hay
+            const { ProveedoresService } = await import('../features/proveedores/proveedores.service.js');
+
+            // Buscar el proveedor vinculado al producto
+            const product = await prisma.product.findUnique({
+                where: { sku: order.sku },
+                include: { provider: true }
+            });
+
+            if (product && product.provider) {
+                console.log(`[OrderService] 🔄 Disparando Dropshipping para ${order.folio} -> ${product.provider.name}`);
+                await ProveedoresService.testPiloto(
+                    product.provider.id,
+                    'Pendiente de Generación', // La guía se suele subir después, o se genera vía API
+                    order.sku,
+                    1,
+                    { clientName: order.clientName, clientAddress: 'Verificar en Panel Admin' }
+                );
+            }
+        } catch (dsErr) {
+            console.error('[OrderService] ⚠️ Error en gatillo de dropshipping:', dsErr.message);
+        }
+    }
+
+    return order;
 }
 
 /**

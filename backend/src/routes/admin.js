@@ -47,14 +47,14 @@ function buildWaMessage({ nombre, empresa, modelo, impresora, daysUsed, yieldPag
 // ── Upsert o crea el proveedor CT Internacional ───────────────────────────────
 async function ensureCTProvider() {
     return prisma.provider.upsert({
-        where:  { code: 'CT' },
+        where: { code: 'CT' },
         update: { active: true },
         create: {
-            name:               'CT Internacional',
-            code:               'CT',
-            dispatchType:       'DIRECT',
+            name: 'CT Internacional',
+            code: 'CT',
+            dispatchType: 'DIRECT',
             defaultShippingCost: 0,
-            active:             true,
+            active: true,
         },
     });
 }
@@ -110,22 +110,22 @@ router.post('/ct/ingest', async (req, res) => {
                 });
 
                 const data = {
-                    sku:               mapped.sku,
-                    name:              mapped.name,
-                    brand:             mapped.brand,
-                    category:          mapped.category,
-                    color:             mapped.color,
-                    yield:             mapped.yield,
-                    compatibility:     mapped.compatibility,
+                    sku: mapped.sku,
+                    name: mapped.name,
+                    brand: mapped.brand,
+                    category: mapped.category,
+                    color: mapped.color,
+                    yield: mapped.yield,
+                    compatibility: mapped.compatibility,
                     availabilityStatus: mapped.availabilityStatus,
-                    productType:       mapped.productType,
-                    costPrice:         mapped.costPrice,
-                    publicPrice:       mapped.publicPrice,
-                    speiPrice:         mapped.speiPrice,
-                    image:             mapped.image,
-                    providerId:        mapped.providerId,
-                    providerSku:       mapped.providerSku,
-                    weightKg:          mapped.weightKg,
+                    productType: mapped.productType,
+                    costPrice: mapped.costPrice,
+                    publicPrice: mapped.publicPrice,
+                    speiPrice: mapped.speiPrice,
+                    image: mapped.image,
+                    providerId: mapped.providerId,
+                    providerSku: mapped.providerSku,
+                    weightKg: mapped.weightKg,
                 };
 
                 if (existing) {
@@ -148,11 +148,11 @@ router.post('/ct/ingest', async (req, res) => {
         console.log(`[CT Ingest] ✅ Completado en ${elapsed}s — Creados: ${created}, Actualizados: ${updated}, Bundles: ${bundlesCreated}`);
 
         res.json({
-            success:        true,
-            elapsed:        `${elapsed}s`,
-            catalog:        { total: rawData.length, filtered: filtered.length },
-            products:       { created, updated, errors: errors.slice(0, 10) },
-            bundles:        { created: bundlesCreated },
+            success: true,
+            elapsed: `${elapsed}s`,
+            catalog: { total: rawData.length, filtered: filtered.length },
+            products: { created, updated, errors: errors.slice(0, 10) },
+            bundles: { created: bundlesCreated },
         });
 
     } catch (error) {
@@ -166,16 +166,16 @@ router.get('/ct/test', async (req, res) => {
     try {
         const token = await getCTToken();
         res.json({
-            success:      true,
-            message:      'Conexión con CT Internacional exitosa.',
+            success: true,
+            message: 'Conexión con CT Internacional exitosa.',
             tokenPreview: `${token.substring(0, 20)}...`,
         });
     } catch (error) {
         res.status(500).json({
             success: false,
-            error:   error.message,
-            fixie:   process.env.FIXIE_URL ? 'configurado' : 'NO configurado',
-            ct_url:  process.env.CT_API_URL || 'http://connect.ctonline.mx:3001',
+            error: error.message,
+            fixie: process.env.FIXIE_URL ? 'configurado' : 'NO configurado',
+            ct_url: process.env.CT_API_URL || 'http://connect.ctonline.mx:3001',
         });
     }
 });
@@ -197,8 +197,8 @@ router.get('/ct/status', async (req, res) => {
         });
 
         res.json({
-            products:   { total: products, inStock, onDemand },
-            bundles:    { total: bundles },
+            products: { total: products, inStock, onDemand },
+            bundles: { total: bundles },
             byCategory: byCategory.map(c => ({ category: c.category, count: c._count.id })),
         });
     } catch (error) {
@@ -221,12 +221,12 @@ router.get('/providers', async (req, res) => {
         res.json({
             total: providers.length,
             providers: providers.map(p => ({
-                id:           p.id,
-                name:         p.name,
-                code:         p.code,
+                id: p.id,
+                name: p.name,
+                code: p.code,
                 dispatchType: p.dispatchType,
-                products:     p._count.products,
-                active:       p.active,
+                products: p._count.products,
+                active: p.active,
             })),
         });
     } catch (error) {
@@ -293,43 +293,43 @@ router.get('/critical-alerts', async (req, res) => {
         for (const sub of subs) {
             if (!sub.consumptionRate || sub.consumptionRate <= 0) continue;
 
-            const daysTotal     = Math.floor(sub.yield / sub.consumptionRate);
+            const daysTotal = Math.floor(sub.yield / sub.consumptionRate);
             const exhaustionDate = addDays(new Date(sub.lastRefillDate), daysTotal);
-            const daysRemaining  = differenceInDays(exhaustionDate, today);
+            const daysRemaining = differenceInDays(exhaustionDate, today);
 
             if (daysRemaining > CRITICAL_DAYS) continue;
 
             const [user, product] = await Promise.all([
                 prisma.user.findUnique({
-                    where:  { id: sub.userId },
+                    where: { id: sub.userId },
                     select: { id: true, name: true, email: true, whatsapp: true, empresa: true, cargo: true },
                 }),
                 prisma.product.findUnique({
-                    where:  { id: sub.productId },
+                    where: { id: sub.productId },
                     select: { name: true, sku: true, publicPrice: true, speiPrice: true },
                 }),
             ]);
 
-            const nombre    = user?.name    ?? 'Cliente';
-            const empresa   = user?.empresa ?? 'tu empresa';
-            const modelo    = product?.sku  ?? 'tóner';
+            const nombre = user?.name ?? 'Cliente';
+            const empresa = user?.empresa ?? 'tu empresa';
+            const modelo = product?.sku ?? 'tóner';
             const impresora = sub.printerModel ?? 'tu impresora';
-            const daysUsed  = differenceInDays(today, new Date(sub.lastRefillDate));
-            const waTarget  = (user?.whatsapp ?? '').replace(/\D/g, '') || WA_ADMIN;
+            const daysUsed = differenceInDays(today, new Date(sub.lastRefillDate));
+            const waTarget = (user?.whatsapp ?? '').replace(/\D/g, '') || WA_ADMIN;
 
             const waMessage = buildWaMessage({ nombre, empresa, modelo, impresora, daysUsed, yieldPages: sub.yield });
 
             alerts.push({
-                subscriptionId:  sub.id,
+                subscriptionId: sub.id,
                 daysRemaining,
-                exhaustionDate:  exhaustionDate.toISOString(),
-                isUrgent:        daysRemaining <= 3,
-                user:            user ?? { id: sub.userId, name: 'Desconocido' },
-                product:         product ?? { name: 'Desconocido', sku: sub.productId },
-                printerModel:    sub.printerModel,
-                yield:           sub.yield,
+                exhaustionDate: exhaustionDate.toISOString(),
+                isUrgent: daysRemaining <= 3,
+                user: user ?? { id: sub.userId, name: 'Desconocido' },
+                product: product ?? { name: 'Desconocido', sku: sub.productId },
+                printerModel: sub.printerModel,
+                yield: sub.yield,
                 consumptionRate: sub.consumptionRate,
-                waUrl:           `https://wa.me/${waTarget}?text=${encodeURIComponent(waMessage)}`,
+                waUrl: `https://wa.me/${waTarget}?text=${encodeURIComponent(waMessage)}`,
             });
         }
 
@@ -356,29 +356,29 @@ router.get('/wa-template/:subscriptionId', async (req, res) => {
 
         const [user, product] = await Promise.all([
             prisma.user.findUnique({
-                where:  { id: sub.userId },
+                where: { id: sub.userId },
                 select: { name: true, whatsapp: true, empresa: true },
             }),
             prisma.product.findUnique({
-                where:  { id: sub.productId },
+                where: { id: sub.productId },
                 select: { name: true, sku: true },
             }),
         ]);
 
-        const today     = new Date();
-        const nombre    = user?.name    ?? 'Cliente';
-        const empresa   = user?.empresa ?? 'tu empresa';
-        const modelo    = product?.sku  ?? 'tóner';
+        const today = new Date();
+        const nombre = user?.name ?? 'Cliente';
+        const empresa = user?.empresa ?? 'tu empresa';
+        const modelo = product?.sku ?? 'tóner';
         const impresora = sub.printerModel ?? 'tu impresora';
-        const daysUsed  = differenceInDays(today, new Date(sub.lastRefillDate));
-        const waTarget  = (user?.whatsapp ?? '').replace(/\D/g, '') || WA_ADMIN;
+        const daysUsed = differenceInDays(today, new Date(sub.lastRefillDate));
+        const waTarget = (user?.whatsapp ?? '').replace(/\D/g, '') || WA_ADMIN;
 
         const message = buildWaMessage({ nombre, empresa, modelo, impresora, daysUsed, yieldPages: sub.yield });
 
         res.json({
-            waUrl:   `https://wa.me/${waTarget}?text=${encodeURIComponent(message)}`,
+            waUrl: `https://wa.me/${waTarget}?text=${encodeURIComponent(message)}`,
             message,
-            target:  waTarget,
+            target: waTarget,
         });
 
     } catch (error) {
@@ -430,59 +430,68 @@ router.post('/telegram/test', async (_req, res) => {
 });
 
 // ── GET /api/admin/ingresos ───────────────────────────────────────────────────
-// Registro de Ingresos: CatalogOrders + PaymentLogs + datos CEP
+// Registro de Ingresos: CatalogOrders + Orders + PaymentLogs + datos CEP
 router.get('/ingresos', async (req, res) => {
     try {
         const { from, to, method, status, page = '1' } = req.query;
         const pageNum = Math.max(1, parseInt(page, 10));
-        const take    = 60;
-        const skip    = (pageNum - 1) * take;
+        const take = 60;
+        const skip = (pageNum - 1) * take;
 
-        // Construir filtro de fechas para CatalogOrders
         const dateFilter = {};
         if (from) dateFilter.gte = new Date(from);
-        if (to)   dateFilter.lte = new Date(new Date(to).getTime() + 86400000);
+        if (to) dateFilter.lte = new Date(new Date(to).getTime() + 86400000);
 
-        const orderWhere = {};
-        if (Object.keys(dateFilter).length) orderWhere.createdAt = dateFilter;
-        if (status) orderWhere.status = status;
+        const where = {};
+        if (Object.keys(dateFilter).length) where.createdAt = dateFilter;
+        if (status) where.status = { contains: status }; // status puede ser PAID_SPEI o PAID
 
-        // CatalogOrders (checkout 3-pasos)
+        // 1. Obtener CatalogOrders
         const catalogOrders = await prisma.catalogOrder.findMany({
-            where: orderWhere,
-            orderBy: { createdAt: 'desc' },
-            take,
-            skip,
+            where, orderBy: { createdAt: 'desc' }, take, skip
         });
 
-        // Obtener PaymentLogs relacionados a estas órdenes
-        const catalogOrderIds = catalogOrders.map(o => o.id);
+        // 2. Obtener Orders (de Factory/Checkout directo)
+        const regularOrders = await prisma.order.findMany({
+            where, orderBy: { createdAt: 'desc' }, take, skip
+        });
+
+        // 3. Unificar y obtener Logs de Pago
+        const allOrders = [
+            ...catalogOrders.map(o => ({ ...o, type: 'CATALOG', total: o.speiTotal })),
+            ...regularOrders.map(o => ({ ...o, type: 'FACTORY', total: o.amount, clientPhone: o.clientContact }))
+        ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+        const orderIds = catalogOrders.map(o => o.id);
+        const factoryIds = regularOrders.map(o => o.id);
+
         const paymentLogs = await prisma.paymentLog.findMany({
             where: {
                 OR: [
-                    { catalogOrderId: { in: catalogOrderIds } },
-                    { claveRastreo:   { not: null } },
+                    { catalogOrderId: { in: orderIds } },
+                    { orderId: { in: factoryIds } },
+                    { claveRastreo: { not: null } },
                 ],
             },
         });
+
         const logMap = new Map();
         for (const l of paymentLogs) {
-            if (l.catalogOrderId) logMap.set(l.catalogOrderId, l);
+            if (l.catalogOrderId) logMap.set(`CATALOG-${l.catalogOrderId}`, l);
+            if (l.orderId) logMap.set(`FACTORY-${l.orderId}`, l);
         }
 
-        const data = catalogOrders.map(order => ({
+        const data = allOrders.map(order => ({
             ...order,
-            paymentLog: logMap.get(order.id) ?? null,
+            paymentLog: logMap.get(`${order.type}-${order.id}`) ?? null,
         }));
 
-        // Estadísticas rápidas
+        // Estadísticas rápidas (Simplificadas para el resumen)
         const stats = await prisma.catalogOrder.groupBy({
-            by: ['status'],
-            _count: { id: true },
-            _sum:   { speiTotal: true },
+            by: ['status'], _count: { id: true }, _sum: { speiTotal: true },
         });
 
-        res.json({ success: true, total: catalogOrders.length, data, stats });
+        res.json({ success: true, total: data.length, data, stats });
     } catch (err) {
         console.error('[admin/ingresos]', err.message);
         res.status(500).json({ success: false, error: err.message });
@@ -501,38 +510,38 @@ router.get('/ingresos/:id/receipt', async (req, res) => {
         });
 
         const receipt = {
-            folio:       order.folio,
-            fecha:       order.createdAt,
-            cliente:     order.clientName,
-            telefono:    order.clientPhone,
-            items:       order.items,
-            subtotal:    order.subtotal,
-            total:       order.speiTotal,
-            metodo:      'SPEI — Transferencia Bancaria',
-            estado:      order.status,
+            folio: order.folio,
+            fecha: order.createdAt,
+            cliente: order.clientName,
+            telefono: order.clientPhone,
+            items: order.items,
+            subtotal: order.subtotal,
+            total: order.speiTotal,
+            metodo: 'SPEI — Transferencia Bancaria',
+            estado: order.status,
             // Datos Banxico CEP
             cep: paymentLog?.cepData ? {
-                bancoEmisor:      paymentLog.cepBancoEmisor,
-                rfcOrdenante:     paymentLog.cepRfcOrdenante,
+                bancoEmisor: paymentLog.cepBancoEmisor,
+                rfcOrdenante: paymentLog.cepRfcOrdenante,
                 horaCertificacion: paymentLog.cepHoraCert,
-                estado:           paymentLog.cepEstado,
-                claveRastreo:     paymentLog.claveRastreo,
-                validadoEn:       paymentLog.validatedAt,
-                validadoPor:      paymentLog.validatedBy,
+                estado: paymentLog.cepEstado,
+                claveRastreo: paymentLog.claveRastreo,
+                validadoEn: paymentLog.validatedAt,
+                validadoPor: paymentLog.validatedBy,
             } : null,
             // Facturación
             facturacion: order.requiresInvoice ? {
-                rfc:          order.rfc,
-                razonSocial:  order.razonSocial,
+                rfc: order.rfc,
+                razonSocial: order.razonSocial,
                 regimenFiscal: order.regimenFiscal,
-                usoCFDI:      order.usoCFDI,
+                usoCFDI: order.usoCFDI,
             } : null,
             // Empresa ToneBOX
             emisor: {
-                nombre:  'ToneBOX México S.A. de C.V.',
-                web:     'tonebox.mx',
+                nombre: 'ToneBOX México S.A. de C.V.',
+                web: 'tonebox.mx',
                 telefono: '844 162 8536',
-                correo:  'hola@tonebox.mx',
+                correo: 'hola@tonebox.mx',
             },
             generadoEn: new Date().toISOString(),
         };
